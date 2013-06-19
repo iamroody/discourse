@@ -60,7 +60,7 @@ namespace :deploy do
     put  File.read("config/redis.yml"), "#{shared_path}/config/redis.yml"
     put  File.read("config/environments/production.rb"), "#{shared_path}/config/environments/production.rb"
     put  File.read("config/initializers/secret_token.rb"), "#{shared_path}/config/initializers/secret_token.rb"
-    sudo "ln -nfs #{release_path}/config/nginx.conf /etc/nginx/sites-enabled/#{application}"
+    put  File.read("config/nginx.conf"), "#{shared_path}/config/nginx.conf"
     puts "Now edit the config files in #{shared_path}."
   end
 
@@ -71,6 +71,7 @@ namespace :deploy do
     run  "ln -nfs #{shared_path}/config/redis.yml #{release_path}/config/redis.yml"
     run  "ln -nfs #{shared_path}/config/environments/production.rb #{release_path}/config/environments/production.rb"
     run  "ln -nfs #{shared_path}/config/initializers/secret_token.rb #{release_path}/config/initializers/secret_token.rb"
+    sudo "ln -nfs #{shared_path}/config/nginx.conf /etc/nginx/sites-enabled/#{application}"
   end
 
 end
