@@ -16,7 +16,7 @@ nl:
   topics: Topics
   posts: berichten
   loading: Laden
-  powered_by_html: 'Powered by <a href="http://www.discourse.org">Discourse</a>, werkt het best JavaScript ingeschakeld'
+  powered_by_html: 'Powered by <a href="http://www.discourse.org">Discourse</a>, werkt het beste met JavaScript ingeschakeld'
 
   via: "%{username} via %{site_name}"
   is_reserved: is gereserveerd
@@ -63,7 +63,7 @@ nl:
       trust_level_2: "trust_level_2"
       trust_level_3: "trust_level_3"
       trust_level_4: "trust_level_4"
-      trust_level_5: "trust_level_5" 
+      trust_level_5: "trust_level_5"
 
   education:
     until_posts:
@@ -441,7 +441,6 @@ nl:
     company_short_name: "De korte naam van het bedrijf dat deze site draait. Wordt gebruikt in juridische delen van de site, zoals /tos"
     company_domain: "De domeinnaam van het bedrijf dat deze site draait. Wordt gebruikt in juridische delen van de site, zoals /tos"
     api_key: "De beveiligde API-sleutel wordt gebruikt om topics te maken en bij te werken. Gebruik /admin/api om deze in te stellen"
-    access_password: "Wanneer beperkte toegang aan staat, moet dit wachtwoord worden opgegeven."
     queue_jobs: "Zet verschillende taken in een queue binnen sidekiq, bij 'false' worden taken ineens uitgevoerd"
     crawl_images: Zet het ophalen van afbeeldingen van externe bronnen aan
     ninja_edit_window: "Hoe snel je een aanpassing kan maken zonder dat er een nieuwe versie wordt opgeslagen, in seconden."
@@ -492,7 +491,7 @@ nl:
     posts_per_page: "Hoeveel berichten er worden weergeven op een topic-pagina"
     system_username: "Vanuit welke gebruikersnaam systeemberichten worden verstuurd"
     send_welcome_message: "Krijgen nieuwe leden een welkomst-privé-bericht?"
-    supress_reply_directly_below: "Laat geen reactieknop zien onder een bericht waarbij de reactie direct onder het bericht zal worden gemaakt"
+    suppress_reply_directly_below: "Laat geen reactieknop zien onder een bericht waarbij de reactie direct onder het bericht zal worden gemaakt"
     allow_index_in_robots_txt: "De site zou geïndexeerd mogen worden door zoekmachines (update robots.txt)"
     email_domains_blacklist: "Een lijst met e-maildomeinen gescheiden door een |-teken van domeinen die niet worden toegestaan. Voorbeeld: mailinator.com|trashmail.net"
     email_domains_whitelist: "Een lijst met e-maildomeinen gescheiden door een |-teken van domeinen die wel worden toegestaan. N.B.: als je hier iets opgeeft, zijn andere domeinen NIET toegestaan."
@@ -574,8 +573,6 @@ nl:
     newuser_max_images: Hoeveel afbeeldingen een nieuw lid in een bericht kan plaatsen
     newuser_max_mentions_per_post: "Maximum aantal @naam notificaties dat een nieuw lid in een bericht kan gebruiken"
     max_mentions_per_post: "Maximum aantal @naam notificaties dat je in een bericht kan gebruiken"
-
-    auto_link_images_wider_than: "Afbeeldingen breder dan dit, in pixels, krijgen automatisch een link naar een lightbox"
 
     email_time_window_mins: "Hoeveel minuten we wachten met het sturen van een e-mail naar een persoon, om ze een kans te geven het eerst op de site te kunnen lezen."
     flush_timings_secs: "Hoe vaak we timing-data naar de server sturen, in seconden."
@@ -722,15 +719,7 @@ nl:
 
       <small>Er zou een unsubscribe footer op elke email die je verstuurt moeten zitten zodat men direct kan afmelden mocht men deze mails niet willen ontvangen. Dus laten we er eentje opzetten!
 
-  request_access:
-    code: Toegangscode
-    instructions: "Dit is een besloten forum, vul hieronder de toegangscode in:"
-    enter: Verder
-    incorrect: Dat is niet de juiste toegangscode
-
   system_messages:
-    site_password: "Oh, en het wachtwoord van de site is '%{access_password}' mocht je het nodig hebben."
-
     post_hidden:
       subject_template: "Bericht van %{site_name}: je bericht is verborgen wegens meldingen uit de community"
       text_body_template: |
@@ -979,6 +968,7 @@ nl:
   deleted: 'verwijderd'
 
   upload:
+    pasted_image_filename: ""
     image:
       fetch_failure: "Er ging iets mis bij het opvragen van de afbeelding."
       unknown_image_type: "Het bestand dat je wil uploaden is geen afbeelding."

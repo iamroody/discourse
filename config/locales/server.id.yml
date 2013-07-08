@@ -305,7 +305,6 @@ id:
     company_full_name: "The full name of the company that runs this site, used in legal documents like the /tos"
     company_short_name: "The short name of the company that runs this site, used in legal documents like the /tos"
     company_domain: "The domain name owned by the company that runs this site, used in legal documents like the /tos"
-    access_password: "When restricted access is enabled, this password must be entered"
     queue_jobs: "Queue various jobs in sidekiq, if false queues are inline"
     crawl_images: "Enable retrieving images from third party sources to insert width and height dimensions"
     ninja_edit_window: "Number of seconds after posting where edits do not create a new version"
@@ -352,7 +351,7 @@ id:
     posts_per_page: "How many posts are returned on a topic page"
     system_username: "Username for the author of automated private messages sent by the forum"
     send_welcome_message: "Do new users get a welcome private message?"
-    supress_reply_directly_below: "Don't show reply count on a post when there is a single reply directly below"
+    suppress_reply_directly_below: "Don't show reply count on a post when there is a single reply directly below"
     allow_index_in_robots_txt: "Site should be indexed by search engines (update robots.txt)"
     email_domains_blacklist: "A pipe-delimited list of email domains that are not allowed. Example: mailinator.com|trashmail.net"
     version_checks: "Ping the Discourse Hub for version updates and show version messages on the /admin dashboard"
@@ -411,8 +410,6 @@ id:
     basic_requires_topics_entered: "How many a topics a new user must enter before promotion to basic (1) trust level"
     basic_requires_read_posts: "How many posts a new user must read before promotion to basic (1) trust level"
     basic_requires_time_spent_mins: "How many minutes a new user must read posts before promotion to basic (1) trust level"
-
-    auto_link_images_wider_than: "Images wider than this, in pixels, will get auto link and lightbox treatment"
 
     email_time_window_mins: "How many minutes we wait before sending a user mail, to give them a chance to see it first"
     flush_timings_secs: "How frequently we flush timing data to the server, in seconds"
@@ -566,15 +563,7 @@ id:
 
       <small>There should be an unsubscribe footer on every email you send, so let's mock one up. This email was sent by Name of Company, 55 Main Street, Anytown, USA 12345. If you would like to opt out of future emails, [click here to unsubscribe][5].</small>
 
-  request_access:
-    code: "Access Code"
-    instructions: "This site has restricted access, enter the access code below:"
-    enter: "Enter"
-    incorrect: "access code was incorrect"
-
   system_messages:
-    site_password: "Also, the site password is `%{access_password}` if you need it."
-
     post_hidden:
       subject_template: "Post hidden due to community flagging"
       text_body_template: |
@@ -789,3 +778,6 @@ id:
     see_more: "See More"
     search_title: "Search for this topic"
     search_google: "Search Google"
+
+  upload:
+    pasted_image_filename: ""

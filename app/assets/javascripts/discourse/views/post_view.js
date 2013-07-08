@@ -9,8 +9,7 @@
 Discourse.PostView = Discourse.View.extend({
   classNames: ['topic-post', 'clearfix'],
   templateName: 'post',
-  classNameBindings: ['post.lastPost',
-                      'postTypeClass',
+  classNameBindings: ['postTypeClass',
                       'selected',
                       'post.hidden:hidden',
                       'post.deleted_at:deleted',
@@ -70,7 +69,16 @@ Discourse.PostView = Discourse.View.extend({
   // Toggle visibility of parent post
   toggleParent: function(e) {
     var postView = this;
+    var post = this.get('post');
     var $parent = this.$('.parent-post');
+    var inReplyTo = post.get('reply_to_post_number');
+
+    if (post.get('post_number') - 1 === inReplyTo) {
+      // true means ... avoid scroll if possible
+      Discourse.TopicView.jumpToPost(post.get('topic_id'), inReplyTo, true);
+      return;
+    }
+
     if (this.get('parentPost')) {
       $('nav', $parent).removeClass('toggled');
       // Don't animate on touch
@@ -81,11 +89,10 @@ Discourse.PostView = Discourse.View.extend({
         $parent.slideUp(function() { postView.set('parentPost', null); });
       }
     } else {
-      var post = this.get('post');
       this.set('loadingParent', true);
       $('nav', $parent).addClass('toggled');
 
-      Discourse.Post.loadByPostNumber(post.get('topic_id'), post.get('reply_to_post_number')).then(function(result) {
+      Discourse.Post.loadByPostNumber(post.get('topic_id'), inReplyTo).then(function(result) {
         postView.set('loadingParent', false);
         // Give the post a reference back to the topic
         result.topic = postView.get('post.topic');
@@ -98,9 +105,9 @@ Discourse.PostView = Discourse.View.extend({
   updateQuoteElements: function($aside, desc) {
     var navLink = "";
     var quoteTitle = Em.String.i18n("post.follow_quote");
-    var postNumber;
+    var postNumber = $aside.data('post');
 
-    if (postNumber = $aside.data('post')) {
+    if (postNumber) {
 
       // If we have a topic reference
       var topicId, topic;
@@ -160,9 +167,9 @@ Discourse.PostView = Discourse.View.extend({
   showLinkCounts: function() {
 
     var postView = this;
-    var link_counts;
+    var link_counts = this.get('post.link_counts');
 
-    if (link_counts = this.get('post.link_counts')) {
+    if (link_counts) {
       _.each(link_counts, function(lc) {
         if (lc.clicks > 0) {
           postView.$(".cooked a[href]").each(function() {
@@ -209,21 +216,6 @@ Discourse.PostView = Discourse.View.extend({
   didInsertElement: function() {
     var $post = this.$();
     var post = this.get('post');
-    var postNumber = post.get('scrollToAfterInsert');
-
-    // Do we want to scroll to this post now that we've inserted it?
-    if (postNumber) {
-      Discourse.TopicView.scrollTo(this.get('post.topic_id'), postNumber);
-      if (postNumber === post.get('post_number')) {
-        var $contents = $('.topic-body .contents', $post);
-        var originalCol = $contents.css('backgroundColor');
-        $contents.css({
-          backgroundColor: "#ffffcc"
-        }).animate({
-          backgroundColor: originalCol
-        }, 2500);
-      }
-    }
     this.showLinkCounts();
 
     // Track this post
@@ -233,20 +225,9 @@ Discourse.PostView = Discourse.View.extend({
     Discourse.SyntaxHighlighting.apply($post);
     Discourse.Lightbox.apply($post);
 
-    // If we're scrolling upwards, adjust the scroll position accordingly
-    var scrollTo = this.get('post.scrollTo');
-    if (scrollTo) {
-      $('body').scrollTop(($(document).height() - scrollTo.height) + scrollTo.top);
-      $('section.divider').addClass('fade');
-    }
-
     // Find all the quotes
     this.insertQuoteControls();
 
-    // be sure that eyeline tracked it
-    var controller = this.get('controller');
-    if (controller && controller.postRendered) {
-      controller.postRendered(post);
-    }
+    $post.addClass('ready');
   }
 });

@@ -63,7 +63,13 @@ Discourse.Category = Discourse.Model.extend({
   removeGroup: function(group){
     this.get("groups").removeObject(group);
     this.get("availableGroups").addObject(group);
-  }
+  },
+
+  // note, this is used in a data attribute, data attributes get downcased
+  //  to avoid confusion later on using this naming here.
+  description_text: function(){
+    return $("<div>" + this.get("description") + "</div>").text();
+  }.property("description")
 
 });
 
@@ -95,7 +101,8 @@ Discourse.Category.reopenClass({
   },
 
   findBySlugOrId: function(slugOrId) {
-    return Discourse.ajax("/categories/" + slugOrId + ".json").then(function (result) {
+    // TODO: all our routing around categories need a rethink
+    return Discourse.ajax("/category/" + slugOrId + "/show.json").then(function (result) {
       return Discourse.Category.create(result.category);
     });
   }

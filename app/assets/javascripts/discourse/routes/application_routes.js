@@ -11,7 +11,6 @@ Discourse.Route.buildRoutes(function() {
   this.resource('topic', { path: '/t/:slug/:id' }, function() {
     this.route('fromParams', { path: '/' });
     this.route('fromParams', { path: '/:nearPost' });
-    this.route('bestOf', { path: '/best_of' });
   });
 
   // Generate static page routes
@@ -30,7 +29,7 @@ Discourse.Route.buildRoutes(function() {
     });
 
     // the homepage is the first item of the 'top_menu' site setting
-    var settings = Discourse.SiteSettings || PreloadStore.get('siteSettings')
+    var settings = Discourse.SiteSettings || PreloadStore.get('siteSettings');
     var homepage = settings.top_menu.split("|")[0].split(",")[0];
     this.route(homepage, { path: '/' });
 

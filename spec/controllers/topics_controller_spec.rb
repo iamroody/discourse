@@ -2,6 +2,44 @@ require 'spec_helper'
 
 describe TopicsController do
 
+
+
+  context 'wordpress' do
+    let!(:user) { log_in(:moderator) }
+    let(:p1) { Fabricate(:post, user: user) }
+    let(:topic) { p1.topic }
+    let!(:p2) { Fabricate(:post, topic: topic, user:user )}
+
+    it "returns the JSON in the format our wordpress plugin needs" do
+      xhr :get, :wordpress, topic_id: topic.id, best: 3
+      response.should be_success
+      json = ::JSON.parse(response.body)
+      json.should be_present
+
+      # The JSON has the data the wordpress plugin needs
+      json['id'].should == topic.id
+      json['posts_count'].should == 2
+      json['filtered_posts_count'].should == 2
+
+      # Posts
+      json['posts'].size.should == 1
+      post = json['posts'][0]
+      post['id'].should == p2.id
+      post['username'].should == user.username
+      post['avatar_template'].should == user.avatar_template
+      post['name'].should == user.name
+      post['created_at'].should be_present
+      post['cooked'].should == p2.cooked
+
+      # Participants
+      json['participants'].size.should == 1
+      participant = json['participants'][0]
+      participant['id'].should == user.id
+      participant['username'].should == user.username
+      participant['avatar_template'].should == user.avatar_template
+    end
+  end
+
   context 'move_posts' do
     it 'needs you to be logged in' do
       lambda { xhr :post, :move_posts, topic_id: 111, title: 'blah', post_ids: [1,2,3] }.should raise_error(Discourse::NotLoggedIn)
@@ -161,18 +199,40 @@ describe TopicsController do
       -> { xhr :get, :similar_to, title: title, raw: raw }.should raise_error(Discourse::InvalidParameters)
     end
 
-    it "delegates to Topic.similar_to" do
-      Topic.expects(:similar_to).with(title, raw, nil).returns([Fabricate(:topic)])
-      xhr :get, :similar_to, title: title, raw: raw
-    end
+    describe "minimum_topics_similar" do
 
-    context "logged in" do
-      let(:user) { log_in }
+      before do
+        SiteSetting.stubs(:minimum_topics_similar).returns(30)
+      end
 
-      it "passes a user throught if logged in" do
-        Topic.expects(:similar_to).with(title, raw, user).returns([Fabricate(:topic)])
+      after do
         xhr :get, :similar_to, title: title, raw: raw
       end
+
+      describe "With enough topics" do
+        before do
+          Topic.stubs(:count).returns(50)
+        end
+
+        it "deletes to Topic.similar_to if there are more topics than `minimum_topics_similar`" do
+          Topic.expects(:similar_to).with(title, raw, nil).returns([Fabricate(:topic)])
+        end
+
+        describe "with a logged in user" do
+          let(:user) { log_in }
+
+          it "passes a user through if logged in" do
+            Topic.expects(:similar_to).with(title, raw, user).returns([Fabricate(:topic)])
+          end
+        end
+
+      end
+
+      it "does not call Topic.similar_to if there are fewer topics than `minimum_topics_similar`" do
+        Topic.stubs(:count).returns(10)
+        Topic.expects(:similar_to).never
+      end
+
     end
 
   end
@@ -438,19 +498,19 @@ describe TopicsController do
 
       it 'grabs first page when no filter is provided' do
         SiteSetting.stubs(:posts_per_page).returns(20)
-        TopicView.any_instance.expects(:filter_posts_in_range).with(0, 20)
+        TopicView.any_instance.expects(:filter_posts_in_range).with(0, 19)
         xhr :get, :show, topic_id: topic.id, slug: topic.slug
       end
 
       it 'grabs first page when first page is provided' do
         SiteSetting.stubs(:posts_per_page).returns(20)
-        TopicView.any_instance.expects(:filter_posts_in_range).with(0, 20)
+        TopicView.any_instance.expects(:filter_posts_in_range).with(0, 19)
         xhr :get, :show, topic_id: topic.id, slug: topic.slug, page: 1
       end
 
       it 'grabs correct range when a page number is provided' do
         SiteSetting.stubs(:posts_per_page).returns(20)
-        TopicView.any_instance.expects(:filter_posts_in_range).with(20, 40)
+        TopicView.any_instance.expects(:filter_posts_in_range).with(20, 39)
         xhr :get, :show, topic_id: topic.id, slug: topic.slug, page: 2
       end
 
@@ -458,17 +518,6 @@ describe TopicsController do
         TopicView.any_instance.expects(:filter_posts_near).with(p2.post_number)
         xhr :get, :show, topic_id: topic.id, slug: topic.slug, post_number: p2.post_number
       end
-
-      it 'delegates a posts_after param to TopicView#filter_posts_after' do
-        TopicView.any_instance.expects(:filter_posts_after).with(p1.post_number)
-        xhr :get, :show, topic_id: topic.id, slug: topic.slug, posts_after: p1.post_number
-      end
-
-      it 'delegates a posts_before param to TopicView#filter_posts_before' do
-        TopicView.any_instance.expects(:filter_posts_before).with(p2.post_number)
-        xhr :get, :show, topic_id: topic.id, slug: topic.slug, posts_before: p2.post_number
-      end
-
     end
 
     context "when 'login required' site setting has been enabled" do

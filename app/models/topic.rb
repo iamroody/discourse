@@ -7,7 +7,7 @@ require_dependency 'text_cleaner'
 require_dependency 'trashable'
 
 class Topic < ActiveRecord::Base
-  include ActionView::Helpers
+  include ActionView::Helpers::SanitizeHelper
   include RateLimiter::OnCreateRecord
   include Trashable
 
@@ -35,8 +35,6 @@ class Topic < ActiveRecord::Base
   rate_limit :limit_topics_per_day
   rate_limit :limit_private_messages_per_day
 
-  before_validation :sanitize_title
-
   validates :title, :presence => true,
                     :topic_title_length => true,
                     :quality_title => { :unless => :private_message? },
@@ -47,6 +45,7 @@ class Topic < ActiveRecord::Base
                                         :collection => Proc.new{ Topic.listable_topics } }
 
   before_validation do
+    self.sanitize_title
     self.title = TextCleaner.clean_title(TextSentinel.title_sentinel(title).text) if errors[:title].empty?
   end
 
@@ -139,7 +138,7 @@ class Topic < ActiveRecord::Base
 
   before_save do
     if (auto_close_at_changed? and !auto_close_at_was.nil?) or (auto_close_user_id_changed? and auto_close_at)
-      self.auto_close_started_at ||= Time.zone.now
+      self.auto_close_started_at ||= Time.zone.now if auto_close_at
       Jobs.cancel_scheduled_job(:close_topic, {topic_id: id})
       true
     end
@@ -298,6 +297,7 @@ class Topic < ActiveRecord::Base
               FROM (SELECT topic_id,
                            round(exp(avg(ln(avg_time)))) AS gmean
                     FROM posts
+                    WHERE avg_time > 0 AND avg_time IS NOT NULL
                     GROUP BY topic_id) AS x
               WHERE x.topic_id = topics.id")
   end
@@ -311,14 +311,14 @@ class Topic < ActiveRecord::Base
       old_category = category
 
       if category_id.present? && category_id != cat.id
-        Category.update_all 'topic_count = topic_count - 1', ['id = ?', category_id]
+        Category.where(['id = ?', category_id]).update_all 'topic_count = topic_count - 1'
       end
 
       self.category_id = cat.id
       save
 
       CategoryFeaturedTopic.feature_topics_for(old_category)
-      Category.update_all 'topic_count = topic_count + 1', id: cat.id
+      Category.where(id: cat.id).update_all 'topic_count = topic_count + 1'
       CategoryFeaturedTopic.feature_topics_for(cat) unless old_category.try(:id) == cat.try(:id)
     end
   end
@@ -354,7 +354,7 @@ class Topic < ActiveRecord::Base
     if name.blank?
       if category_id.present?
         CategoryFeaturedTopic.feature_topics_for(category)
-        Category.update_all 'topic_count = topic_count - 1', id: category_id
+        Category.where(id: category_id).update_all 'topic_count = topic_count - 1'
       end
       self.category_id = nil
       save

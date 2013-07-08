@@ -99,9 +99,14 @@ Discourse.Markdown = {
     var converter = new Markdown.Converter();
     var mentionLookup = opts.mentionLookup || Discourse.Mention.lookupCache;
 
-    var quoteTemplate = null;
+    var quoteTemplate = null, urlsTemplate = null;
 
     // Before cooking callbacks
+    converter.hooks.chain("preConversion", function(text) {
+      // If a user puts text right up against a quote, make sure the spacing is equivalnt to a new line
+      return text.replace(/\[\/quote\]/, "[/quote]\n");
+    });
+
     converter.hooks.chain("preConversion", function(text) {
       Discourse.Markdown.trigger('beforeCook', { detail: text, opts: opts });
       return Discourse.Markdown.textResult || text;
@@ -114,6 +119,13 @@ Discourse.Markdown = {
       return extracted.text;
     });
 
+    // Extract urls in BBCode tags so they are not passed through markdown.
+    converter.hooks.chain("preConversion", function(text) {
+      var extracted = Discourse.BBCode.extractUrls(text);
+      urlsTemplate = extracted.template;
+      return extracted.text;
+    });
+
     // Support autolinking of www.something.com
     converter.hooks.chain("preConversion", function(text) {
       return text.replace(/(^|[\s\n])(www\.[a-z\.\-\_\(\)\/\?\=\%0-9]+)/gim, function(full, _, rest) {
@@ -122,7 +134,8 @@ Discourse.Markdown = {
     });
 
     // newline prediction in trivial cases
-    if (!Discourse.SiteSettings.traditional_markdown_linebreaks) {
+    var linebreaks = opts.traditional_markdown_linebreaks || Discourse.SiteSettings.traditional_markdown_linebreaks;
+    if (!linebreaks) {
       converter.hooks.chain("preConversion", function(text) {
         return text.replace(/(^[\w<][^\n]*\n+)/gim, function(t) {
           if (t.match(/\n{2}/gim)) return t;
@@ -177,12 +190,11 @@ Discourse.Markdown = {
     });
 
     converter.hooks.chain("postConversion", function(text) {
-
       // reapply quotes
-      if (quoteTemplate) {
-        text = quoteTemplate(text);
-      }
-
+      if (quoteTemplate) { text = quoteTemplate(text); }
+      // reapply urls
+      if (urlsTemplate) { text = urlsTemplate(text); }
+      // format with BBCode
       return Discourse.BBCode.format(text, opts);
     });
 

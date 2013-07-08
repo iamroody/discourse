@@ -69,6 +69,20 @@ describe Topic do
     end
   end
 
+  context 'admin topic title' do
+    let(:admin) { Fabricate(:admin) }
+
+    it 'allows really short titles' do
+      pm = Fabricate.build(:private_message_topic, user: admin, title: 'a')
+      expect(pm).to be_valid
+    end
+
+    it 'but not blank' do
+      pm = Fabricate.build(:private_message_topic, title: '')
+      expect(pm).to_not be_valid
+    end
+  end
+
   context 'topic title uniqueness' do
 
     let!(:topic) { Fabricate(:topic) }
@@ -220,7 +234,7 @@ describe Topic do
     let(:category) { Fabricate(:category, user: user) }
     let!(:topic) { Fabricate(:topic, user: user, category: category) }
     let!(:p1) { Fabricate(:post, topic: topic, user: user) }
-    let!(:p2) { Fabricate(:post, topic: topic, user: another_user)}
+    let!(:p2) { Fabricate(:post, topic: topic, user: another_user, raw: "Has a link to [evil trout](http://eviltrout.com) which is a cool site.")}
     let!(:p3) { Fabricate(:post, topic: topic, user: user)}
     let!(:p4) { Fabricate(:post, topic: topic, user: user)}
 
@@ -265,6 +279,7 @@ describe Topic do
       before do
         topic.expects(:add_moderator_post)
         TopicUser.update_last_read(user, topic.id, p4.post_number, 0)
+        TopicLink.extract_from(p2)
       end
 
       context "to a new topic" do
@@ -289,6 +304,7 @@ describe Topic do
           p2.reload
           p2.sort_order.should == 1
           p2.post_number.should == 1
+          p2.topic_links.first.topic_id.should == new_topic.id
 
           p4.reload
           p4.post_number.should == 2

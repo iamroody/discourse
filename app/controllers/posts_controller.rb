@@ -4,7 +4,7 @@ require_dependency 'post_destroyer'
 class PostsController < ApplicationController
 
   # Need to be logged in for all actions here
-  before_filter :ensure_logged_in, except: [:show, :replies, :by_number, :short_link]
+  before_filter :ensure_logged_in, except: [:show, :replies, :by_number, :short_link, :versions]
 
   skip_before_filter :store_incoming_links, only: [:short_link]
   skip_before_filter :check_xhr, only: [:markdown,:short_link]
@@ -189,18 +189,27 @@ class PostsController < ApplicationController
   private
 
     def create_params
-      params.require(:raw)
-      params.permit(
-          :raw, 
-          :topic_id, 
-          :title, 
-          :archetype, 
-          :category, 
-          :target_usernames, 
-          :reply_to_post_number, 
-          :image_sizes, 
+      permitted = [
+          :raw,
+          :topic_id,
+          :title,
+          :archetype,
+          :category,
+          :target_usernames,
+          :reply_to_post_number,
+          :image_sizes,
           :auto_close_days
-        ).tap do |whitelisted|
+      ]
+
+      if api_key_valid?
+        # php seems to be sending this incorrectly, don't fight with it
+        params[:skip_validations] = params[:skip_validations].to_s == "true"
+        permitted << :skip_validations
+      end
+
+      params.require(:raw)
+      params.permit(*permitted).tap do |whitelisted|
+          # TODO this does not feel right, we should name what meta_data is allowed
           whitelisted[:meta_data] = params[:meta_data]
       end
     end

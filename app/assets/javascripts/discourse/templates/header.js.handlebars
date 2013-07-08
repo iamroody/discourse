@@ -10,7 +10,7 @@
             <a {{bindAttr class=":star topic.starred:starred"}} {{action toggleStar}} href='#' {{bindAttr title="topic.favoriteTooltip"}}></a>
           {{/if}}
           <h1>
-          {{#if topic.fancy_title}}
+          {{#if topic.details.loaded}}
             {{topicStatus topic=topic}}
             <a class='topic-link' href='{{unbound topic.url}}'>{{{topic.fancy_title}}}</a>
           {{else}}
@@ -112,7 +112,7 @@
       <section class='d-dropdown' id='site-map-dropdown'>
       <ul>
         {{#if currentUser.staff}}
-          <li><a href="/admin"><i class='icon icon-cog'></i>{{i18n admin_title}}</a></li>
+          <li><a href="/admin"><i class='icon icon-wrench'></i>{{i18n admin_title}}</a></li>
           <li><a href="/admin/flags/active"><i class='icon icon-flag'></i>{{i18n flags_title}}</a>
           {{#if currentUser.site_flagged_posts_count}}
             <a href='/admin/flags/active' title='{{i18n notifications.total_flagged}}' class='badge-notification flagged-posts'>{{currentUser.site_flagged_posts_count}}</a>
@@ -122,7 +122,8 @@
         <li>
           {{#titledLinkTo "list.latest" titleKey="filters.latest.help"}}{{i18n filters.latest.title}}{{/titledLinkTo}}
         </li>
-        <li>{{#linkTo 'faq'}}{{i18n faq}}{{/linkTo}}</li>
+        <li>{{faqLink}}</li>
+
         {{#if categories}}
           <li class='heading' title="{{i18n filters.categories.help}}">
             {{#linkTo "list.categories"}}{{i18n filters.categories.title}}{{/linkTo}}

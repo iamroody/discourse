@@ -34,8 +34,8 @@ class Post < ActiveRecord::Base
 
   validates_with ::Validators::PostValidator
 
-  # We can pass a hash of image sizes when saving to prevent crawling those images
-  attr_accessor :image_sizes, :quoted_post_numbers, :no_bump, :invalidate_oneboxes
+  # We can pass several creating options to a post via attributes
+  attr_accessor :image_sizes, :quoted_post_numbers, :no_bump, :invalidate_oneboxes, :cooking_options
 
   SHORT_POST_CHARS = 1200
 
@@ -366,7 +366,7 @@ class Post < ActiveRecord::Base
     return if post.nil?
     post_reply = post.post_replies.new(reply_id: id)
     if post_reply.save
-      Post.update_all ['reply_count = reply_count + 1'], id: post.id
+      Post.where(id: post.id).update_all ['reply_count = reply_count + 1']
     end
   end
 end

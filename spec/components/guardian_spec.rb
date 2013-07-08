@@ -190,9 +190,14 @@ describe Guardian do
       Guardian.new(user).can_invite_to?(topic).should be_false
     end
 
-    it 'returns false when the site requires approving users' do
+    it 'returns true when the site requires approving users and is mod' do
       SiteSetting.expects(:must_approve_users?).returns(true)
-      Guardian.new(moderator).can_invite_to?(topic).should be_false
+      Guardian.new(moderator).can_invite_to?(topic).should be_true
+    end
+
+    it 'returns true when the site requires approving users and is regular' do
+      SiteSetting.expects(:must_approve_users?).returns(true)
+      Guardian.new(coding_horror).can_invite_to?(topic).should be_false
     end
 
   end
@@ -929,6 +934,28 @@ describe Guardian do
       it "is true if user has no posts" do
         Guardian.new(admin).can_delete_user?(user).should be_true
       end
+    end
+  end
+
+  describe 'can_grant_title?' do
+    it 'is false without a logged in user' do
+      Guardian.new(nil).can_grant_title?(user).should be_false
+    end
+
+    it 'is false for regular users' do
+      Guardian.new(user).can_grant_title?(user).should be_false
+    end
+
+    it 'is true for moderators' do
+      Guardian.new(moderator).can_grant_title?(user).should be_true
+    end
+
+    it 'is true for admins' do
+      Guardian.new(admin).can_grant_title?(user).should be_true
+    end
+
+    it 'is false without a user to look at' do
+      Guardian.new(admin).can_grant_title?(nil).should be_false
     end
   end
 

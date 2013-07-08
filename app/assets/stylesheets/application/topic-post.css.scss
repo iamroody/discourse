@@ -370,6 +370,30 @@
       .score {
         font-size: 12px;
       }
+      .user-title {
+        font-size: 11px;
+        background-color: none;
+        margin-top: 2px;
+        color: #555;
+      }
+    }
+  }
+  .topic-meta-data-inside {
+    float: right;
+    z-index: 490;
+    margin-left: 20px;
+    .post-info {
+      font-size: 12px;
+      display: inline-block;
+      margin-right: 12px;
+      &.edits {
+        a, a:visited {
+          color: #aaa;
+        }
+      }
+    }
+    .post-date {
+      color: #aaa;
     }
   }
   .reply-to-tab {
@@ -398,6 +422,10 @@
     border-bottom: 1px solid #b9b9b9;
     display: none;
     overflow: hidden;
+    .arrow {
+      float: right;
+      margin: 3px 0 3px 0;
+    }
   }
   .embedded-posts.top {
     @include border-radius-top(4px);
@@ -407,6 +435,10 @@
 
   .embedded-posts {
     background-color: #e9e6e6;
+
+    .topic-meta-data-inside {
+      margin: 3px -8px 3px 20px;
+    }
 
     div.reply {
       border-left: 1px solid #b9b9b9;
@@ -446,11 +478,8 @@
         }
 
         a.arrow {
-          float: right;
-          margin: 3px 0 3px 0;
           color: grey;
         }
-
       }
       .about {
         .contents {
@@ -479,6 +508,7 @@
     position: relative;
     font-size: 16px;
     line-height: 20px;
+
     .post-select {
       @include border-radius-all(4px);
       background-color: $light_gray;
@@ -489,32 +519,12 @@
       color: $darkish_gray;
       top: 4px;
       position: absolute;
-      right: 316px;
+      right: 5px;
       font-size: 12px;
       padding: 2px 5px;
       z-index: 490;
     }
-    .topic-meta-data-inside {
-      float: right;
-      margin-right: 10px;
-      z-index: 490;
-      .post-info {
-        font-size: 12px;
-        display: inline-block;
-        margin-right: 12px;
-        &:first-child {
-          margin-right: 0;
-        }
-        &.edits {
-          a, a:visited {
-            color: #aaa;
-          }
-        }
-      }
-      .post-date {
-        color: #aaa;
-      }
-    }
+
     img {
       max-width: 100%;
     }
@@ -522,7 +532,7 @@
       position: relative;
       .contents {
         .cooked {
-          padding: 25px 10px 0;
+          padding: 10px 10px 0;
         }
         position: relative;
         border: 1px solid #b9b9b9;
@@ -548,6 +558,10 @@
         @include box-shadow(0 1px 2px rgba($black, 0.07));
       }
       .contents.avoid-tab {
+        .topic-meta-data-inside {
+          position: relative;
+          top: -30px;
+        }
         padding-top: 30px;
         .cooked {
           padding-top: 10px;
