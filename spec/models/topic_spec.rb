@@ -192,7 +192,7 @@ describe Topic do
       context "secure categories" do
 
         let(:user) { Fabricate(:user) }
-        let(:category) { Fabricate(:category, secure: true) }
+        let(:category) { Fabricate(:category, read_restricted: true) }
 
         before do
           topic.category = category
@@ -228,175 +228,6 @@ describe Topic do
 
   end
 
-  context 'move_posts' do
-    let(:user) { Fabricate(:user) }
-    let(:another_user) { Fabricate(:evil_trout) }
-    let(:category) { Fabricate(:category, user: user) }
-    let!(:topic) { Fabricate(:topic, user: user, category: category) }
-    let!(:p1) { Fabricate(:post, topic: topic, user: user) }
-    let!(:p2) { Fabricate(:post, topic: topic, user: another_user, raw: "Has a link to [evil trout](http://eviltrout.com) which is a cool site.")}
-    let!(:p3) { Fabricate(:post, topic: topic, user: user)}
-    let!(:p4) { Fabricate(:post, topic: topic, user: user)}
-
-    before do
-      # add a like to a post
-      PostAction.act(another_user, p4, PostActionType.types[:like])
-    end
-
-    context 'success' do
-
-      it "enqueues a job to notify users" do
-        topic.stubs(:add_moderator_post)
-        Jobs.expects(:enqueue).with(:notify_moved_posts, post_ids: [p2.id, p4.id], moved_by_id: user.id)
-        topic.move_posts(user, [p2.id, p4.id], title: "new testing topic name")
-      end
-
-      it "adds a moderator post at the location of the first moved post" do
-        topic.expects(:add_moderator_post).with(user, instance_of(String), has_entries(post_number: 2))
-        topic.move_posts(user, [p2.id, p4.id], title: "new testing topic name")
-      end
-
-    end
-
-    context "errors" do
-
-      it "raises an error when one of the posts doesn't exist" do
-        lambda { topic.move_posts(user, [1003], title: "new testing topic name") }.should raise_error(Discourse::InvalidParameters)
-      end
-
-      it "raises an error and does not create a topic if no posts were moved" do
-        Topic.count.tap do |original_topic_count|
-          lambda {
-            topic.move_posts(user, [], title: "new testing topic name")
-          }.should raise_error(Discourse::InvalidParameters)
-
-          expect(Topic.count).to eq original_topic_count
-        end
-      end
-    end
-
-    context "successfully moved" do
-      before do
-        topic.expects(:add_moderator_post)
-        TopicUser.update_last_read(user, topic.id, p4.post_number, 0)
-        TopicLink.extract_from(p2)
-      end
-
-      context "to a new topic" do
-        let!(:new_topic) { topic.move_posts(user, [p2.id, p4.id], title: "new testing topic name") }
-
-        it "works correctly" do
-          TopicUser.where(user_id: user.id, topic_id: topic.id).first.last_read_post_number.should == p3.post_number
-
-          new_topic.should be_present
-          new_topic.featured_user1_id.should == another_user.id
-          new_topic.like_count.should == 1
-
-          new_topic.category.should == category
-          topic.featured_user1_id.should be_blank
-          new_topic.posts.should =~ [p2, p4]
-
-          new_topic.reload
-          new_topic.posts_count.should == 2
-          new_topic.highest_post_number.should == 2
-          expect(new_topic.last_posted_at).to be_present
-
-          p2.reload
-          p2.sort_order.should == 1
-          p2.post_number.should == 1
-          p2.topic_links.first.topic_id.should == new_topic.id
-
-          p4.reload
-          p4.post_number.should == 2
-          p4.sort_order.should == 2
-
-          topic.reload
-          topic.featured_user1_id.should be_blank
-          topic.like_count.should == 0
-          topic.posts_count.should == 2
-          topic.posts.should =~ [p1, p3]
-          topic.highest_post_number.should == p3.post_number
-
-        end
-      end
-
-      context "to an existing topic" do
-
-        let!(:destination_topic) { Fabricate(:topic, user: user ) }
-        let!(:destination_op) { Fabricate(:post, topic: destination_topic, user: user) }
-        let!(:moved_to) { topic.move_posts(user, [p2.id, p4.id], destination_topic_id: destination_topic.id )}
-
-        it "works correctly" do
-          moved_to.should == destination_topic
-
-          # Check out new topic
-          moved_to.reload
-          moved_to.posts_count.should == 3
-          moved_to.highest_post_number.should == 3
-          moved_to.featured_user1_id.should == another_user.id
-          moved_to.like_count.should == 1
-          moved_to.category.should be_blank
-
-          # Posts should be re-ordered
-          p2.reload
-          p2.sort_order.should == 2
-          p2.post_number.should == 2
-          p2.topic_id.should == moved_to.id
-
-          p4.reload
-          p4.post_number.should == 3
-          p4.sort_order.should == 3
-          p4.topic_id.should == moved_to.id
-
-          # Check out the original topic
-          topic.reload
-          topic.posts_count.should == 2
-          topic.highest_post_number.should == 3
-          topic.featured_user1_id.should be_blank
-          topic.like_count.should == 0
-          topic.posts_count.should == 2
-          topic.posts.should =~ [p1, p3]
-          topic.highest_post_number.should == p3.post_number
-
-          # Should update last reads
-          TopicUser.where(user_id: user.id, topic_id: topic.id).first.last_read_post_number.should == p3.post_number
-        end
-      end
-
-      context "moving the first post" do
-
-        let!(:new_topic) { topic.move_posts(user, [p1.id, p2.id], title: "new testing topic name") }
-
-        it "copies the OP, doesn't delete it" do
-          new_topic.should be_present
-          new_topic.posts.first.raw.should == p1.raw
-
-          new_topic.reload
-          new_topic.posts_count.should == 2
-          new_topic.highest_post_number.should == 2
-
-          # First post didn't move
-          p1.reload
-          p1.sort_order.should == 1
-          p1.post_number.should == 1
-          p1.topic_id == topic.id
-
-          # Second post is in a new topic
-          p2.reload
-          p2.post_number.should == 2
-          p2.sort_order.should == 2
-          p2.topic_id == new_topic.id
-
-          topic.reload
-          topic.posts.should =~ [p1, p3, p4]
-          topic.highest_post_number.should == p4.post_number
-        end
-
-      end
-
-
-    end
-  end
 
   context 'private message' do
     let(:coding_horror) { User.where(username: 'CodingHorror').first }
@@ -504,11 +335,10 @@ describe Topic do
       @topic = Fabricate(:topic, bumped_at: 1.year.ago)
     end
 
-
     it 'updates the bumped_at field when a new post is made' do
       @topic.bumped_at.should be_present
       lambda {
-        Fabricate(:post, topic: @topic, user: @topic.user)
+        create_post(topic: @topic, user: @topic.user)
         @topic.reload
       }.should change(@topic, :bumped_at)
     end
@@ -790,8 +620,8 @@ describe Topic do
   context 'last_poster info' do
 
     before do
-      @user = Fabricate(:user)
-      @post = Fabricate(:post, user: @user)
+      @post = create_post
+      @user = @post.user
       @topic = @post.topic
     end
 
@@ -802,7 +632,7 @@ describe Topic do
     context 'after a second post' do
       before do
         @second_user = Fabricate(:coding_horror)
-        @new_post = Fabricate(:post, topic: @topic, user: @second_user)
+        @new_post = create_post(topic: @topic, user: @second_user)
         @topic.reload
       end
 
@@ -831,7 +661,7 @@ describe Topic do
   end
 
   describe 'meta data' do
-    let(:topic) { Fabricate(:topic, meta_data: {hello: 'world'}) }
+    let(:topic) { Fabricate(:topic, meta_data: {'hello' => 'world'}) }
 
     it 'allows us to create a topic with meta data' do
       topic.meta_data['hello'].should == 'world'
@@ -841,7 +671,7 @@ describe Topic do
 
       context 'existing key' do
         before do
-          topic.update_meta_data(hello: 'bane')
+          topic.update_meta_data('hello' => 'bane')
         end
 
         it 'updates the key' do
@@ -851,7 +681,7 @@ describe Topic do
 
       context 'new key' do
         before do
-          topic.update_meta_data(city: 'gotham')
+          topic.update_meta_data('city' => 'gotham')
         end
 
         it 'adds the new key' do
@@ -1263,7 +1093,7 @@ describe Topic do
 
   describe 'secured' do
     it 'can remove secure groups' do
-      category = Fabricate(:category, secure: true)
+      category = Fabricate(:category, read_restricted: true)
       topic = Fabricate(:topic, category: category)
 
       Topic.secured(Guardian.new(nil)).count.should == 0
@@ -1280,17 +1110,50 @@ describe Topic do
     let(:category){ Category.new }
 
     it "is true if the category is secure" do
-      category.stubs(:secure).returns(true)
-      Topic.new(:category => category).should be_secure_category
+      category.stubs(:read_restricted).returns(true)
+      Topic.new(:category => category).should be_read_restricted_category
     end
 
     it "is false if the category is not secure" do
-      category.stubs(:secure).returns(false)
-      Topic.new(:category => category).should_not be_secure_category
+      category.stubs(:read_restricted).returns(false)
+      Topic.new(:category => category).should_not be_read_restricted_category
     end
 
     it "is false if there is no category" do
-      Topic.new(:category => nil).should_not be_secure_category
+      Topic.new(:category => nil).should_not be_read_restricted_category
+    end
+  end
+
+  describe 'trash!' do
+    context "its category's topic count" do
+      let(:moderator) { Fabricate(:moderator) }
+      let(:category) { Fabricate(:category) }
+
+      it "subtracts 1 if topic is being deleted" do
+        topic = Fabricate(:topic, category: category)
+        expect { topic.trash!(moderator) }.to change { category.reload.topic_count }.by(-1)
+      end
+
+      it "doesn't subtract 1 if topic is already deleted" do
+        topic = Fabricate(:topic, category: category, deleted_at: 1.day.ago)
+        expect { topic.trash!(moderator) }.to_not change { category.reload.topic_count }
+      end
+    end
+  end
+
+  describe 'recover!' do
+    context "its category's topic count" do
+      let(:category) { Fabricate(:category) }
+
+      it "adds 1 if topic is deleted" do
+        topic = Fabricate(:topic, category: category, deleted_at: 1.day.ago)
+        expect { topic.recover! }.to change { category.reload.topic_count }.by(1)
+      end
+
+      it "doesn't add 1 if topic is not deleted" do
+        topic = Fabricate(:topic, category: category)
+        expect { topic.recover! }.to_not change { category.reload.topic_count }
+      end
     end
   end
 end

@@ -65,15 +65,15 @@ Discourse.ListTopicsController = Discourse.ObjectController.extend({
     if (!this.get('allLoaded')) return;
     var category = this.get('category');
     if( category ) {
-      return Em.String.i18n('topics.bottom.category', {category: category.get('name')});
+      return I18n.t('topics.bottom.category', {category: category.get('name')});
     } else {
       var split = this.get('filter').split('/');
       if (this.get('topics.length') === 0) {
-        return Em.String.i18n("topics.none." + split[0], {
+        return I18n.t("topics.none." + split[0], {
           category: split[1]
         });
       } else {
-        return Em.String.i18n("topics.bottom." + split[0], {
+        return I18n.t("topics.bottom." + split[0], {
           category: split[1]
         });
       }
@@ -81,11 +81,11 @@ Discourse.ListTopicsController = Discourse.ObjectController.extend({
   }.property('allLoaded', 'topics.length'),
 
   loadMore: function() {
-    this.set('loadingMore', true);
-    var listTopicsController = this;
-    return this.get('model').loadMoreTopics().then(function(hasMoreTopics) {
-      listTopicsController.set('loadingMore', false);
-      return hasMoreTopics;
+    var topicList = this.get('model');
+    return topicList.loadMoreTopics().then(function(moreUrl) {
+      if (!Em.isEmpty(moreUrl)) {
+        Discourse.URL.replaceState(Discourse.getURL("/") + topicList.get('filter') + "/more");
+      }
     });
   }
 

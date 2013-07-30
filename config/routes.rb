@@ -96,6 +96,8 @@ Discourse::Application.routes.draw do
     end
   end
 
+  get 'session/csrf' => 'session#csrf'
+
   resources :users, except: [:show, :update] do
     collection do
       get 'check_username'
@@ -119,16 +121,20 @@ Discourse::Application.routes.draw do
 
   get 'user_preferences' => 'users#user_preferences_redirect'
   get 'users/:username/private-messages' => 'user_actions#private_messages', constraints: {username: USERNAME_ROUTE_FORMAT}
+  get 'users/:username/private-messages/:filter' => 'user_actions#private_messages', constraints: {username: USERNAME_ROUTE_FORMAT}
   get 'users/:username' => 'users#show', constraints: {username: USERNAME_ROUTE_FORMAT}
   put 'users/:username' => 'users#update', constraints: {username: USERNAME_ROUTE_FORMAT}
   get 'users/:username/preferences' => 'users#preferences', constraints: {username: USERNAME_ROUTE_FORMAT}, as: :email_preferences
   get 'users/:username/preferences/email' => 'users#preferences', constraints: {username: USERNAME_ROUTE_FORMAT}
   put 'users/:username/preferences/email' => 'users#change_email', constraints: {username: USERNAME_ROUTE_FORMAT}
+  get 'users/:username/preferences/about-me' => 'users#preferences', constraints: {username: USERNAME_ROUTE_FORMAT}
   get 'users/:username/preferences/username' => 'users#preferences', constraints: {username: USERNAME_ROUTE_FORMAT}
   put 'users/:username/preferences/username' => 'users#username', constraints: {username: USERNAME_ROUTE_FORMAT}
   get 'users/:username/avatar(/:size)' => 'users#avatar', constraints: {username: USERNAME_ROUTE_FORMAT}
   get 'users/:username/invited' => 'users#invited', constraints: {username: USERNAME_ROUTE_FORMAT}
   post 'users/:username/send_activation_email' => 'users#send_activation_email', constraints: {username: USERNAME_ROUTE_FORMAT}
+  get 'users/:username/activity' => 'users#show', constraints: {username: USERNAME_ROUTE_FORMAT}
+  get 'users/:username/activity/:filter' => 'users#show', constraints: {username: USERNAME_ROUTE_FORMAT}
 
   resources :uploads
 
@@ -197,6 +203,7 @@ Discourse::Application.routes.draw do
   post 't' => 'topics#create'
   post 'topics/timings'
   get 'topics/similar_to'
+  get 'topics/created-by/:username' => 'list#topics_by', as: 'topics_by', constraints: {username: USERNAME_ROUTE_FORMAT}
 
   # Legacy route for old avatars
   get 'threads/:topic_id/:post_number/avatar' => 'topics#avatar', constraints: {topic_id: /\d+/, post_number: /\d+/}
@@ -217,7 +224,7 @@ Discourse::Application.routes.draw do
   put 't/:topic_id/unmute' => 'topics#unmute', constraints: {topic_id: /\d+/}
   put 't/:topic_id/autoclose' => 'topics#autoclose', constraints: {topic_id: /\d+/}
   put 't/:topic_id/remove-allowed-user' => 'topics#remove_allowed_user', constraints: {topic_id: /\d+/}
-
+  put 't/:topic_id/recover' => 'topics#recover', constraints: {topic_id: /\d+/}
   get 't/:topic_id/:post_number' => 'topics#show', constraints: {topic_id: /\d+/, post_number: /\d+/}
   get 't/:slug/:topic_id.rss' => 'topics#feed', format: :rss, constraints: {topic_id: /\d+/}
   get 't/:slug/:topic_id' => 'topics#show', constraints: {topic_id: /\d+/}

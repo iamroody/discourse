@@ -11,12 +11,11 @@
 // Externals we need to load first
 //= require ../../app/assets/javascripts/external/jquery-1.9.1.js
 //= require ../../app/assets/javascripts/external/jquery.ui.widget.js
-//= require ../../app/assets/javascripts/external/handlebars-1.0.rc.4.js
+//= require ../../app/assets/javascripts/external/handlebars.js
 //= require ../../app/assets/javascripts/external_development/ember.js
 //= require ../../app/assets/javascripts/external_development/group-helper.js
 
 //= require ../../app/assets/javascripts/locales/i18n
-//= require ../../app/assets/javascripts/locales/date_locales.js
 //= require ../../app/assets/javascripts/discourse/helpers/i18n_helpers
 //= require ../../app/assets/javascripts/locales/en
 
@@ -46,14 +45,14 @@
 
 // sinon settings
 sinon.config = {
-    injectIntoThis: true,
-    injectInto: null,
-    properties: ["spy", "stub", "mock", "clock", "sandbox"],
-    useFakeTimers: false,
-    useFakeServer: false
+  injectIntoThis: true,
+  injectInto: null,
+  properties: ["spy", "stub", "mock", "clock", "sandbox"],
+  useFakeTimers: false,
+  useFakeServer: false
 };
 
-window.assetPath = function() { return null };
+window.assetPath = function() { return null; };
 
 var oldAjax = $.ajax;
 $.ajax = function() {
@@ -80,5 +79,7 @@ Discourse.Router.map(function() {
 QUnit.testStart(function() {
   // Allow our tests to change site settings and have them reset before the next test
   Discourse.SiteSettings = jQuery.extend(true, {}, Discourse.SiteSettingsOriginal);
-})
+  Discourse.BaseUri = "/";
+  Discourse.BaseUrl = "";
+});
 

@@ -14,7 +14,10 @@ Discourse.CategoryChooserView = Discourse.ComboboxView.extend({
 
   init: function() {
     this._super();
-    this.set('content', Discourse.Category.list());
+    // TODO perhaps allow passing a param in to select if we need full or not
+    this.set('content', _.filter(Discourse.Category.list(), function(c){
+      return c.permission === Discourse.PermissionType.FULL;
+    }));
   },
 
   none: function() {
@@ -24,10 +27,10 @@ Discourse.CategoryChooserView = Discourse.ComboboxView.extend({
   template: function(text, templateData) {
     if (!templateData.color) return text;
 
-    var result = "<span class='badge-category' style='background-color: #" + templateData.color + '; color: #' +
-        templateData.text_color + ";'>" + templateData.name + "</span>";
+    var result = "<div class='badge-category' style='background-color: #" + templateData.color + '; color: #' +
+        templateData.text_color + ";'>" + templateData.name + "</div>";
 
-    result += " <span class='topic-count'>&times; " + templateData.topic_count + "</span>";
+    result += " <div class='topic-count'>&times; " + templateData.topic_count + "</div>";
 
     var description = templateData.description_text;
     // TODO wtf how can this be null?

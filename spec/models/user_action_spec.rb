@@ -9,7 +9,6 @@ describe UserAction do
   it { should validate_presence_of :action_type }
   it { should validate_presence_of :user_id }
 
-
   describe 'lists' do
 
     let(:public_post) { Fabricate(:post) }
@@ -62,13 +61,13 @@ describe UserAction do
 
       other_stats.should == expecting
 
-      public_topic.trash!
+      public_topic.trash!(user)
       stats_for_user.should == []
       stream_count.should == 0
 
       # groups
 
-      category = Fabricate(:category, secure: true)
+      category = Fabricate(:category, read_restricted: true)
 
       public_topic.recover!
       public_topic.category = category
@@ -82,11 +81,14 @@ describe UserAction do
       group.add(u)
       group.save
 
-      category.allow(group)
+      category.set_permissions(group => :full)
       category.save
 
       stats_for_user(u).should == [UserAction::NEW_TOPIC]
       stream_count(u).should == 1
+
+      # duplicate should not exception out
+      log_test_action
 
     end
   end
@@ -108,6 +110,7 @@ describe UserAction do
     it "creates a new stream entry" do
       PostAction.act(liker, post, PostActionType.types[:like])
       likee_stream.count.should == @old_count + 1
+
     end
 
     context "successful like" do
@@ -254,6 +257,34 @@ describe UserAction do
       # anon should see nothing
       stream = UserAction.private_message_stream(UserAction::NEW_PRIVATE_MESSAGE, user_id: user.id, guardian: Guardian.new(nil))
       stream.count.should == 0
+
+    end
+  end
+
+  describe 'ensure_consistency!' do
+    it 'correct target_topic_id' do
+      post = Fabricate(:post)
+
+      action = UserAction.log_action!(
+        action_type: UserAction::NEW_PRIVATE_MESSAGE,
+        user_id: post.user.id,
+        acting_user_id: post.user.id,
+        target_topic_id: -1,
+        target_post_id: post.id,
+      )
+
+      UserAction.log_action!(
+        action_type: UserAction::NEW_PRIVATE_MESSAGE,
+        user_id: post.user.id,
+        acting_user_id: post.user.id,
+        target_topic_id: -2,
+        target_post_id: post.id,
+      )
+
+      UserAction.ensure_consistency!
+
+      action.reload
+      action.target_topic_id.should == post.topic_id
 
     end
   end

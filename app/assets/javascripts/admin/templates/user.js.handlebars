@@ -4,7 +4,7 @@
     <div class='field'>{{i18n user.username.title}}</div>
     <div class='value'>{{username}}</div>
     <div class='controls'>
-      {{#linkTo 'user.activity' content class="btn"}}
+      {{#linkTo 'userActivity' class="btn"}}
         <i class='icon icon-user'></i>
         {{i18n admin.user.show_public_profile}}
       {{/linkTo}}
@@ -109,7 +109,7 @@
       {{else}}
         {{#if can_send_activation_email}}
           <button class='btn' {{action sendActivationEmail target="content"}}>
-            <i class='icon icon-envelope-alt'></i>
+            <i class='icon icon-envelope'></i>
             {{i18n admin.user.send_activation_email}}
           </button>
         {{/if}}
@@ -165,7 +165,7 @@
   <div class='display-row'>
     <div class='field'>{{i18n trust_level}}</div>
     <div class="value">
-      {{combobox content=trustLevels value=trustLevel.id }}
+      {{combobox content=trustLevels value=trust_level nameProperty="detailedName"}}
     </div>
     <div class="controls">
     {{#if dirty}}
@@ -278,7 +278,7 @@
 <section>
   <hr/>
   <button class="btn btn-danger pull-right" {{action destroy target="content"}} {{bindAttr disabled="deleteForbidden"}} {{bindAttr title="deleteButtonTitle"}}>
-    <i class="icon icon-trash"></i>
+    <i class="icon icon-warning-sign"></i>
     {{i18n admin.user.delete}}
   </button>
 </section>

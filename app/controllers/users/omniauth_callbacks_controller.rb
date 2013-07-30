@@ -15,7 +15,8 @@ class Users::OmniauthCallbacksController < ApplicationController
   # need to be able to call this
   skip_before_filter :check_xhr
 
-  # must be done, cause we may trigger a POST
+  # this is the only spot where we allow CSRF, our openid / oauth redirect
+  # will not have a CSRF token, however the payload is all validated so its safe
   skip_before_filter :verify_authenticity_token, only: :complete
 
   def complete
@@ -60,22 +61,7 @@ class Users::OmniauthCallbacksController < ApplicationController
       auth_provider: "Twitter"
     }
 
-    if user_info
-      if user_info.user.active?
-        if Guardian.new(user_info.user).can_access_forum?
-          log_on_user(user_info.user)
-          @data[:authenticated] = true
-        else
-          @data[:awaiting_approval] = true
-        end
-      else
-        @data[:awaiting_activation] = true
-        # send another email ?
-      end
-    else
-      @data[:name] = screen_name
-    end
-
+    process_user_info(user_info, screen_name)
   end
 
   def create_or_sign_on_user_using_facebook(auth_token)
@@ -265,24 +251,7 @@ class Users::OmniauthCallbacksController < ApplicationController
       auth_provider: "Github"
     }
 
-    if user_info
-      if user_info.user.active?
-
-        if Guardian.new(user_info.user).can_access_forum?
-          log_on_user(user_info.user)
-          @data[:authenticated] = true
-        else
-          @data[:awaiting_approval] = true
-        end
-
-      else
-        @data[:awaiting_activation] = true
-        # send another email ?
-      end
-    else
-      @data[:name] = screen_name
-    end
-
+    process_user_info(user_info, screen_name)
   end
 
   def create_or_sign_on_user_using_persona(auth_token)
@@ -318,6 +287,26 @@ class Users::OmniauthCallbacksController < ApplicationController
   end
 
   private
+
+  def process_user_info(user_info, screen_name)
+    if user_info
+      if user_info.user.active?
+
+        if Guardian.new(user_info.user).can_access_forum?
+          log_on_user(user_info.user)
+          @data[:authenticated] = true
+        else
+          @data[:awaiting_approval] = true
+        end
+
+      else
+        @data[:awaiting_activation] = true
+        # send another email ?
+      end
+    else
+      @data[:name] = screen_name
+    end
+  end
 
   def invite_only?
     SiteSetting.invite_only? && !@data[:authenticated]

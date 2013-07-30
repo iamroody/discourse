@@ -1,5 +1,11 @@
 module("Discourse.Topic");
 
+test("defaults", function() {
+  var topic = Discourse.Topic.create({id: 1234});
+  blank(topic.get('deleted_at'), 'deleted_at defaults to blank');
+  blank(topic.get('deleted_by'), 'deleted_by defaults to blank');
+});
+
 test('has details', function() {
   var topic = Discourse.Topic.create({id: 1234});
   var topicDetails = topic.get('details');
@@ -36,4 +42,28 @@ test("updateFromJson", function() {
   equal(topic.get('details.hello'), 'world', 'it updates the details');
   equal(topic.get('cool'), "property", "it updates other properties");
   equal(topic.get('category'), category);
+});
+
+test("destroy", function() {
+  var user = Discourse.User.create({username: 'eviltrout'});
+  var topic = Discourse.Topic.create({id: 1234});
+
+  this.stub(Discourse, 'ajax');
+
+  topic.destroy(user);
+  present(topic.get('deleted_at'), 'deleted at is set');
+  equal(topic.get('deleted_by'), user, 'deleted by is set');
+  //ok(Discourse.ajax.calledOnce, "it called delete over the wire");
+});
+
+test("recover", function() {
+  var user = Discourse.User.create({username: 'eviltrout'});
+  var topic = Discourse.Topic.create({id: 1234, deleted_at: new Date(), deleted_by: user});
+
+  this.stub(Discourse, 'ajax');
+
+  topic.recover();
+  blank(topic.get('deleted_at'), "it clears deleted_at");
+  blank(topic.get('deleted_by'), "it clears deleted_by");
+  //ok(Discourse.ajax.calledOnce, "it called recover over the wire");
 });

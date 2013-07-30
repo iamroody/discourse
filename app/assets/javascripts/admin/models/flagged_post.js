@@ -12,7 +12,7 @@ Discourse.FlaggedPost = Discourse.Post.extend({
     return _(this.post_actions)
       .groupBy(function(a){ return a.post_action_type_id; })
       .map(function(v,k){
-        return Em.String.i18n('admin.flags.summary.action_type_' + k, {count: v.length});
+        return I18n.t('admin.flags.summary.action_type_' + k, {count: v.length});
       })
       .join(',');
   }.property(),
@@ -23,7 +23,7 @@ Discourse.FlaggedPost = Discourse.Post.extend({
     r = [];
     _.each(this.post_actions, function(action) {
       var user = _this.userLookup[action.user_id];
-      var flagType = Em.String.i18n('admin.flags.summary.action_type_' + action.post_action_type_id, {count: 1});
+      var flagType = I18n.t('admin.flags.summary.action_type_' + action.post_action_type_id, {count: 1});
       r.push({user: user, flagType: flagType, flaggedAt: action.created_at});
     });
     return r;
@@ -57,6 +57,14 @@ Discourse.FlaggedPost = Discourse.Post.extend({
     return !this.get('topic_visible');
   }.property('topic_hidden'),
 
+  flaggedForSpam: function() {
+    return !_.every(this.get('post_actions'), function(action) { return action.name_key !== 'spam'; });
+  }.property('post_actions.@each.name_key'),
+
+  canDeleteAsSpammer: function() {
+    return (Discourse.User.current('staff') && this.get('flaggedForSpam') && this.get('user.can_delete_all_posts') && this.get('user.can_be_deleted'));
+  }.property('flaggedForSpam'),
+
   deletePost: function() {
     if (this.get('post_number') === '1') {
       return Discourse.ajax('/t/' + this.topic_id, { type: 'DELETE', cache: false });
@@ -77,9 +85,7 @@ Discourse.FlaggedPost = Discourse.Post.extend({
     return Discourse.ajax('/admin/flags/agree/' + this.id, { type: 'POST', cache: false });
   },
 
-  postHidden: function() {
-    return (this.get('hidden'));
-  }.property(),
+  postHidden: Em.computed.alias('hidden'),
 
   extraClasses: function() {
     var classes = [];
@@ -92,9 +98,8 @@ Discourse.FlaggedPost = Discourse.Post.extend({
     return classes.join(' ');
   }.property(),
 
-  deleted: function() {
-    return (this.get('deleted_at') || this.get('topic_deleted_at'));
-  }.property()
+  deleted: Em.computed.or('deleted_at', 'topic_deleted_at')
+
 });
 
 Discourse.FlaggedPost.reopenClass({

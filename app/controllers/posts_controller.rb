@@ -1,5 +1,6 @@
 require_dependency 'post_creator'
 require_dependency 'post_destroyer'
+require_dependency 'distributed_memoizer'
 
 class PostsController < ApplicationController
 
@@ -25,21 +26,36 @@ class PostsController < ApplicationController
   end
 
   def create
-    post_creator = PostCreator.new(current_user, create_params)
-    post = post_creator.create
-    if post_creator.errors.present?
+    params = create_params
 
-      # If the post was spam, flag all the user's posts as spam
-      current_user.flag_linked_posts_as_spam if post_creator.spam?
+    key = params_key(params)
 
-      render_json_error(post_creator)
-    else
-      post_serializer = PostSerializer.new(post, scope: guardian, root: false)
-      post_serializer.topic_slug = post.topic.slug if post.topic.present?
-      post_serializer.draft_sequence = DraftSequence.current(current_user, post.topic.draft_key)
-      render_json_dump(post_serializer)
+    result = DistributedMemoizer.memoize(key, 120) do
+      post_creator = PostCreator.new(current_user, params)
+      post = post_creator.create
+      if post_creator.errors.present?
+
+        # If the post was spam, flag all the user's posts as spam
+        current_user.flag_linked_posts_as_spam if post_creator.spam?
+
+        "e" << MultiJson.dump(errors: post_creator.errors.full_messages)
+      else
+        post_serializer = PostSerializer.new(post, scope: guardian, root: false)
+        post_serializer.topic_slug = post.topic.slug if post.topic.present?
+        post_serializer.draft_sequence = DraftSequence.current(current_user, post.topic.draft_key)
+        "s" << MultiJson.dump(post_serializer)
+      end
     end
 
+
+    payload = result[1..-1]
+    if result[0] == "e"
+      # don't memoize errors
+      $redis.del(DistributedMemoizer.redis_key(key))
+      render json: payload, status: 422
+    else
+      render json: payload
+    end
   end
 
   def update
@@ -94,17 +110,13 @@ class PostsController < ApplicationController
     @post = Post.where(topic_id: params[:topic_id], post_number: params[:post_number]).first
     guardian.ensure_can_see!(@post)
     @post.revert_to(params[:version].to_i) if params[:version].present?
-    post_serializer = PostSerializer.new(@post, scope: guardian, root: false)
-    post_serializer.add_raw = true
-    render_json_dump(post_serializer)
+    render_post_json(@post)
   end
 
   def show
     @post = find_post_from_params
     @post.revert_to(params[:version].to_i) if params[:version].present?
-    post_serializer = PostSerializer.new(@post, scope: guardian, root: false)
-    post_serializer.add_raw = true
-    render_json_dump(post_serializer)
+    render_post_json(@post)
   end
 
   def destroy
@@ -120,8 +132,11 @@ class PostsController < ApplicationController
   def recover
     post = find_post_from_params
     guardian.ensure_can_recover_post!(post)
-    post.recover!
-    render nothing: true
+    destroyer = PostDestroyer.new(current_user, post)
+    destroyer.recover
+    post.reload
+
+    render_post_json(post)
   end
 
   def destroy_many
@@ -186,20 +201,39 @@ class PostsController < ApplicationController
       post
     end
 
+  def render_post_json(post)
+    post_serializer = PostSerializer.new(post, scope: guardian, root: false)
+    post_serializer.add_raw = true
+    render_json_dump(post_serializer)
+  end
+
   private
+
+    def params_key(params)
+      "post##" << Digest::SHA1.hexdigest(params
+        .to_a
+        .concat([["user", current_user.id]])
+        .sort{|x,y| x[0] <=> y[0]}.join do |x,y|
+          "#{x}:#{y}"
+        end)
+    end
 
     def create_params
       permitted = [
-          :raw,
-          :topic_id,
-          :title,
-          :archetype,
-          :category,
-          :target_usernames,
-          :reply_to_post_number,
-          :image_sizes,
-          :auto_close_days
+        :raw,
+        :topic_id,
+        :title,
+        :archetype,
+        :category,
+        :target_usernames,
+        :reply_to_post_number,
+        :image_sizes,
+        :auto_close_days,
+        :auto_track
       ]
+
+      # param munging for WordPress
+      params[:auto_track] = !(params[:auto_track].to_s == "false") if params[:auto_track]
 
       if api_key_valid?
         # php seems to be sending this incorrectly, don't fight with it

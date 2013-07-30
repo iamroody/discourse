@@ -215,8 +215,9 @@ describe Guardian do
 
       it 'correctly handles groups' do
         group = Fabricate(:group)
-        category = Fabricate(:category, secure: true)
-        category.allow(group)
+        category = Fabricate(:category, read_restricted: true)
+        category.set_permissions(group => :full)
+        category.save
 
         topic = Fabricate(:topic, category: category)
 
@@ -229,20 +230,22 @@ describe Guardian do
     end
 
     describe 'a Post' do
+
+      let(:another_admin) { Fabricate(:admin) }
       it 'correctly handles post visibility' do
         post = Fabricate(:post)
         topic = post.topic
 
         Guardian.new(user).can_see?(post).should be_true
 
-        post.trash!
+        post.trash!(another_admin)
         post.reload
         Guardian.new(user).can_see?(post).should be_false
         Guardian.new(admin).can_see?(post).should be_true
 
         post.recover!
         post.reload
-        topic.trash!
+        topic.trash!(another_admin)
         topic.reload
         Guardian.new(user).can_see?(post).should be_false
         Guardian.new(admin).can_see?(post).should be_true
@@ -273,7 +276,26 @@ describe Guardian do
       end
     end
 
+    describe 'a Topic' do
+      it 'should check for full permissions' do
+        category = Fabricate(:category)
+        category.set_permissions(:everyone => :create_post)
+        category.save
+        Guardian.new(user).can_create?(Topic,category).should be_false
+      end
+    end
+
     describe 'a Post' do
+
+      it "is false on readonly categories" do
+        category = Fabricate(:category)
+        topic.category = category
+        category.set_permissions(:everyone => :readonly)
+        category.save
+
+        Guardian.new(topic.user).can_create?(Post, topic).should be_false
+
+      end
 
       it "is false when not logged in" do
         Guardian.new.can_create?(Post, topic).should be_false
@@ -316,7 +338,6 @@ describe Guardian do
         end
 
         context 'regular users' do
-
           it "doesn't allow new posts from regular users" do
             Guardian.new(coding_horror).can_create?(Post, topic).should be_false
           end
@@ -324,7 +345,6 @@ describe Guardian do
           it 'allows editing of posts' do
             Guardian.new(coding_horror).can_edit?(post).should be_false
           end
-
         end
 
         it "allows new posts from moderators" do
@@ -335,6 +355,26 @@ describe Guardian do
           Guardian.new(admin).can_create?(Post, topic).should be_true
         end
       end
+
+      context "trashed topic" do
+        before do
+          topic.deleted_at = Time.now
+        end
+
+        it "doesn't allow new posts from regular users" do
+          Guardian.new(coding_horror).can_create?(Post, topic).should be_false
+        end
+
+        it "doesn't allow new posts from moderators users" do
+          Guardian.new(moderator).can_create?(Post, topic).should be_false
+        end
+
+        it "doesn't allow new posts from admins" do
+          Guardian.new(admin).can_create?(Post, topic).should be_false
+        end
+
+      end
+
 
     end
 
@@ -390,6 +430,25 @@ describe Guardian do
     end
   end
 
+  describe "can_recover_topic?" do
+
+    it "returns false for a nil user" do
+      Guardian.new(nil).can_recover_topic?(topic).should be_false
+    end
+
+    it "returns false for a nil object" do
+      Guardian.new(user).can_recover_topic?(nil).should be_false
+    end
+
+    it "returns false for a regular user" do
+      Guardian.new(user).can_recover_topic?(topic).should be_false
+    end
+
+    it "returns true for a moderator" do
+      Guardian.new(moderator).can_recover_topic?(topic).should be_true
+    end
+  end
+
   describe "can_recover_post?" do
 
     it "returns false for a nil user" do
@@ -426,6 +485,16 @@ describe Guardian do
         Guardian.new(post.user).can_edit?(post).should be_true
       end
 
+      it 'returns false if you are trying to edit a post you soft deleted' do
+        post.user_deleted = true
+        Guardian.new(post.user).can_edit?(post).should be_false
+      end
+
+      it 'returns false if you are trying to edit a deleted post' do
+        post.deleted_at = 1.day.ago
+        Guardian.new(post.user).can_edit?(post).should be_false
+      end
+
       it 'returns false if another regular user tries to edit your post' do
         Guardian.new(coding_horror).can_edit?(post).should be_false
       end
@@ -454,12 +523,24 @@ describe Guardian do
         Guardian.new(coding_horror).can_edit?(topic).should be_false
       end
 
-      it 'returns true as a moderator' do
-        Guardian.new(moderator).can_edit?(topic).should be_true
+      context 'not archived' do
+        it 'returns true as a moderator' do
+          Guardian.new(moderator).can_edit?(topic).should be_true
+        end
+
+        it 'returns true as an admin' do
+          Guardian.new(admin).can_edit?(topic).should be_true
+        end
       end
 
-      it 'returns true as an admin' do
-        Guardian.new(admin).can_edit?(topic).should be_true
+      context 'archived' do
+        it 'returns false as a moderator' do
+          Guardian.new(moderator).can_edit?(build(:topic, user: user, archived: true)).should be_false
+        end
+
+        it 'returns false as an admin' do
+          Guardian.new(admin).can_edit?(build(:topic, user: user, archived: true)).should be_false
+        end
       end
     end
 
@@ -587,6 +668,7 @@ describe Guardian do
     end
 
   end
+
 
 
 
@@ -908,7 +990,7 @@ describe Guardian do
 
   end
 
-  context "can_delete_user?" do
+  describe "can_delete_user?" do
     it "is false without a logged in user" do
       Guardian.new(nil).can_delete_user?(user).should be_false
     end
@@ -921,19 +1003,83 @@ describe Guardian do
       Guardian.new(user).can_delete_user?(coding_horror).should be_false
     end
 
-    it "is false for moderators" do
-      Guardian.new(moderator).can_delete_user?(coding_horror).should be_false
+    shared_examples "can_delete_user examples" do
+      let(:deletable_user) { Fabricate.build(:user, created_at: 5.minutes.ago) }
+
+      it "is true if user is not an admin and is not too old" do
+        Guardian.new(actor).can_delete_user?(deletable_user).should be_true
+      end
+
+      it "is false if user is an admin" do
+        Guardian.new(actor).can_delete_user?(another_admin).should be_false
+      end
+
+      it "is false if user is too old" do
+        SiteSetting.stubs(:delete_user_max_age).returns(7)
+        Guardian.new(actor).can_delete_user?(Fabricate(:user, created_at: 8.days.ago)).should be_false
+      end
+    end
+
+    context "for moderators" do
+      let(:actor) { moderator }
+      include_examples "can_delete_user examples"
     end
 
     context "for admins" do
-      it "is false if user has posts" do
-        Fabricate(:post, user: user)
-        Guardian.new(admin).can_delete_user?(user).should be_false
+      let(:actor) { admin }
+      include_examples "can_delete_user examples"
+    end
+  end
+
+  describe "can_delete_all_posts?" do
+    it "is false without a logged in user" do
+      Guardian.new(nil).can_delete_all_posts?(user).should be_false
+    end
+
+    it "is false without a user to look at" do
+      Guardian.new(admin).can_delete_all_posts?(nil).should be_false
+    end
+
+    it "is false for regular users" do
+      Guardian.new(user).can_delete_all_posts?(coding_horror).should be_false
+    end
+
+    shared_examples "can_delete_all_posts examples" do
+      it "is true if user is newer than 7 days old" do
+        Guardian.new(actor).can_delete_all_posts?(Fabricate.build(:user, created_at: 6.days.ago)).should be_true
       end
 
-      it "is true if user has no posts" do
-        Guardian.new(admin).can_delete_user?(user).should be_true
+      it "is false if user is older than 7 days old" do
+        Guardian.new(actor).can_delete_all_posts?(Fabricate.build(:user, created_at: 8.days.ago)).should be_false
       end
+
+      it "is false if user is an admin" do
+        Guardian.new(actor).can_delete_all_posts?(admin).should be_false
+      end
+
+      it "is true if number of posts is small" do
+        u = Fabricate.build(:user, created_at: 1.day.ago)
+        u.stubs(:post_count).returns(1)
+        SiteSetting.stubs(:delete_all_posts_max).returns(10)
+        Guardian.new(actor).can_delete_all_posts?(u).should be_true
+      end
+
+      it "is false if number of posts is not small" do
+        u = Fabricate.build(:user, created_at: 1.day.ago)
+        u.stubs(:post_count).returns(11)
+        SiteSetting.stubs(:delete_all_posts_max).returns(10)
+        Guardian.new(actor).can_delete_all_posts?(u).should be_false
+      end
+    end
+
+    context "for moderators" do
+      let(:actor) { moderator }
+      include_examples "can_delete_all_posts examples"
+    end
+
+    context "for admins" do
+      let(:actor) { admin }
+      include_examples "can_delete_all_posts examples"
     end
   end
 
@@ -956,6 +1102,26 @@ describe Guardian do
 
     it 'is false without a user to look at' do
       Guardian.new(admin).can_grant_title?(nil).should be_false
+    end
+  end
+
+
+  describe 'can_change_trust_level?' do
+
+    it 'is false without a logged in user' do
+      Guardian.new(nil).can_change_trust_level?(user).should be_false
+    end
+
+    it 'is false for regular users' do
+      Guardian.new(user).can_change_trust_level?(user).should be_false
+    end
+
+    it 'is true for moderators' do
+      Guardian.new(moderator).can_change_trust_level?(user).should be_true
+    end
+
+    it 'is true for admins' do
+      Guardian.new(admin).can_change_trust_level?(user).should be_true
     end
   end
 

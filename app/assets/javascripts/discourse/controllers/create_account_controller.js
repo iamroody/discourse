@@ -14,6 +14,7 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
   accountPasswordConfirm: 0,
   accountChallenge: 0,
   formSubmitted: false,
+  rejectedEmails: Em.A([]),
 
   submitDisabled: function() {
     if (this.get('formSubmitted')) return true;
@@ -42,14 +43,14 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
     if (this.get('accountName').length < 3) {
       return Discourse.InputValidation.create({
         failed: true,
-        reason: Em.String.i18n('user.name.too_short')
+        reason: I18n.t('user.name.too_short')
       });
     }
 
     // Looks good!
     return Discourse.InputValidation.create({
       ok: true,
-      reason: Em.String.i18n('user.name.ok')
+      reason: I18n.t('user.name.ok')
     });
   }.property('accountName'),
 
@@ -64,10 +65,18 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
     }
 
     email = this.get("accountEmail");
+
+    if (this.get('rejectedEmails').contains(email)) {
+      return Discourse.InputValidation.create({
+        failed: true,
+        reason: I18n.t('user.email.invalid')
+      });
+    }
+
     if ((this.get('authOptions.email') === email) && this.get('authOptions.email_valid')) {
       return Discourse.InputValidation.create({
         ok: true,
-        reason: Em.String.i18n('user.email.authenticated', {
+        reason: I18n.t('user.email.authenticated', {
           provider: this.get('authOptions.auth_provider')
         })
       });
@@ -76,15 +85,15 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
     if (Discourse.Utilities.emailValid(email)) {
       return Discourse.InputValidation.create({
         ok: true,
-        reason: Em.String.i18n('user.email.ok')
+        reason: I18n.t('user.email.ok')
       });
     }
 
     return Discourse.InputValidation.create({
       failed: true,
-      reason: Em.String.i18n('user.email.invalid')
+      reason: I18n.t('user.email.invalid')
     });
-  }.property('accountEmail'),
+  }.property('accountEmail', 'rejectedEmails.@each'),
 
   usernameMatch: function() {
     if (this.usernameNeedsToBeValidatedWithEmail()) {
@@ -92,7 +101,7 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
         if (this.shouldCheckUsernameMatch()) {
           return this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
             failed: true,
-            reason: Em.String.i18n('user.username.enter_email')
+            reason: I18n.t('user.username.enter_email')
           }));
         } else {
           return this.set('uniqueUsernameValidation', Discourse.InputValidation.create({ failed: true }));
@@ -100,7 +109,7 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
       } else if (this.shouldCheckUsernameMatch()) {
         this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
           failed: true,
-          reason: Em.String.i18n('user.username.checking')
+          reason: I18n.t('user.username.checking')
         }));
         return this.checkUsernameAvailability();
       }
@@ -121,7 +130,7 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
     if (this.get('accountUsername').length < 3) {
       return Discourse.InputValidation.create({
         failed: true,
-        reason: Em.String.i18n('user.username.too_short')
+        reason: I18n.t('user.username.too_short')
       });
     }
 
@@ -129,7 +138,7 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
     if (this.get('accountUsername').length > 15) {
       return Discourse.InputValidation.create({
         failed: true,
-        reason: Em.String.i18n('user.username.too_long')
+        reason: I18n.t('user.username.too_long')
       });
     }
 
@@ -137,7 +146,7 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
     // Let's check it out asynchronously
     return Discourse.InputValidation.create({
       failed: true,
-      reason: Em.String.i18n('user.username.checking')
+      reason: I18n.t('user.username.checking')
     });
   }.property('accountUsername'),
 
@@ -155,12 +164,12 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
             _this.set('globalNicknameExists', true);
             return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
               ok: true,
-              reason: Em.String.i18n('user.username.global_match')
+              reason: I18n.t('user.username.global_match')
             }));
           } else {
             return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
               ok: true,
-              reason: Em.String.i18n('user.username.available')
+              reason: I18n.t('user.username.available')
             }));
           }
         } else {
@@ -169,12 +178,12 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
               _this.set('globalNicknameExists', true);
               return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
                 failed: true,
-                reason: Em.String.i18n('user.username.global_mismatch', result)
+                reason: I18n.t('user.username.global_mismatch', result)
               }));
             } else {
               return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
                 failed: true,
-                reason: Em.String.i18n('user.username.not_available', result)
+                reason: I18n.t('user.username.not_available', result)
               }));
             }
           } else if (result.errors) {
@@ -186,7 +195,7 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
             _this.set('globalNicknameExists', true);
             return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
               failed: true,
-              reason: Em.String.i18n('user.username.enter_email')
+              reason: I18n.t('user.username.enter_email')
             }));
           }
         }
@@ -228,14 +237,14 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
     if (password.length < 6) {
       return Discourse.InputValidation.create({
         failed: true,
-        reason: Em.String.i18n('user.password.too_short')
+        reason: I18n.t('user.password.too_short')
       });
     }
 
     // Looks good!
     return Discourse.InputValidation.create({
       ok: true,
-      reason: Em.String.i18n('user.password.ok')
+      reason: I18n.t('user.password.ok')
     });
   }.property('accountPassword'),
 
@@ -261,7 +270,10 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
         createAccountController.flash(result.message);
         createAccountController.set('complete', true);
       } else {
-        createAccountController.flash(result.message || Em.String.i18n('create_account.failed'), 'error');
+        createAccountController.flash(result.message || I18n.t('create_account.failed'), 'error');
+        if (result.errors && result.errors.email && result.values) {
+          createAccountController.get('rejectedEmails').pushObject(result.values.email);
+        }
         createAccountController.set('formSubmitted', false);
       }
       if (result.active) {
@@ -269,7 +281,7 @@ Discourse.CreateAccountController = Discourse.Controller.extend(Discourse.ModalF
       }
     }, function() {
       createAccountController.set('formSubmitted', false);
-      return createAccountController.flash(Em.String.i18n('create_account.failed'), 'error');
+      return createAccountController.flash(I18n.t('create_account.failed'), 'error');
     });
   }
 

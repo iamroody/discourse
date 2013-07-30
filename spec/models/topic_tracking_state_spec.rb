@@ -7,7 +7,7 @@ describe TopicTrackingState do
   end
 
   let(:post) do
-    Fabricate(:post)
+    create_post
   end
 
   it "can correctly publish unread" do
@@ -20,6 +20,7 @@ describe TopicTrackingState do
     report.length.should == 0
 
     new_post = post
+    post.topic.notifier.watch_topic!(post.topic.user_id)
 
     report = TopicTrackingState.report([user.id])
 
@@ -38,7 +39,7 @@ describe TopicTrackingState do
     TopicTrackingState.report([user.id], post.topic_id + 1).should be_empty
 
     # when we reply the poster should have an unread row
-    Fabricate(:post, user: user, topic: post.topic)
+    create_post(user: user, topic: post.topic)
 
     report = TopicTrackingState.report([post.user_id, user.id])
     report.length.should == 1
@@ -51,7 +52,7 @@ describe TopicTrackingState do
     row.user_id.should == post.user_id
 
     # when we have no permission to see a category, don't show its stats
-    category = Fabricate(:category, secure: true)
+    category = Fabricate(:category, read_restricted: true)
 
     post.topic.category_id = category.id
     post.topic.save

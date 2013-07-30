@@ -13,6 +13,20 @@ Discourse.AdminUsersListRoute = Discourse.Route.extend({
 });
 
 /**
+  Index should just redirect to active
+
+  @class AdminUsersIndexRoute
+  @extends Discourse.Route
+  @namespace Discourse
+  @module Discourse
+**/
+Discourse.AdminUsersListIndexRoute = Discourse.Route.extend({
+  redirect: function() {
+    this.transitionTo('adminUsersList.active');
+  }
+});
+
+/**
   Handles the route that lists active users.
 
   @class AdminUsersListActiveRoute
@@ -93,5 +107,19 @@ Discourse.AdminUsersListModeratorsRoute = Discourse.Route.extend({
 Discourse.AdminUsersListBlockedRoute = Discourse.Route.extend({
   setupController: function() {
     return this.controllerFor('adminUsersList').show('blocked');
+  }
+});
+
+/**
+  Handles the route that lists banned users.
+
+  @class AdminUsersListBannedRoute
+  @extends Discourse.Route
+  @namespace Discourse
+  @module Discourse
+**/
+Discourse.AdminUsersListBannedRoute = Discourse.Route.extend({
+  setupController: function() {
+    return this.controllerFor('adminUsersList').show('banned');
   }
 });

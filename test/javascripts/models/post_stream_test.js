@@ -83,6 +83,27 @@ test('updateFromJson', function() {
   equal(postStream.get('extra_property'), 12);
 });
 
+test("removePosts", function() {
+  var postStream = buildStream(10000001, [1,2,3]);
+
+  var p1 = Discourse.Post.create({id: 1, post_number: 2}),
+      p2 = Discourse.Post.create({id: 2, post_number: 3}),
+      p3 = Discourse.Post.create({id: 3, post_number: 4});
+
+  postStream.appendPost(p1);
+  postStream.appendPost(p2);
+  postStream.appendPost(p3);
+
+  // Removing nothing does nothing
+  postStream.removePosts();
+  equal(postStream.get('posts.length'), 3);
+
+  postStream.removePosts([p1, p3]);
+  equal(postStream.get('posts.length'), 1);
+  deepEqual(postStream.get('stream'), [2]);
+
+});
+
 test("cancelFilter", function() {
   var postStream = buildStream(1235);
 
@@ -213,7 +234,7 @@ test("identity map", function() {
   deepEqual(postStream.listUnloadedIds([1, 2, 3, 4]), [2, 4], "it only returns unloaded posts");
 });
 
-asyncTest("loadIntoIdentityMap with no data", function() {
+asyncTestDiscourse("loadIntoIdentityMap with no data", function() {
   var postStream = buildStream(1234);
   expect(1);
 
@@ -224,11 +245,11 @@ asyncTest("loadIntoIdentityMap with no data", function() {
   });
 });
 
-asyncTest("loadIntoIdentityMap with post ids", function() {
+asyncTestDiscourse("loadIntoIdentityMap with post ids", function() {
   var postStream = buildStream(1234);
   expect(1);
 
-  this.stub(Discourse, "ajax").returns(resolvingPromiseWith({
+  this.stub(Discourse, "ajax").returns(Ember.RSVP.resolve({
     post_stream: {
       posts: [{id: 10, post_number: 10}]
     }
@@ -255,7 +276,8 @@ test("staging and undoing a new post", function() {
   });
 
   // Stage the new post in the stream
-  postStream.stagePost(stagedPost, user);
+  var result = postStream.stagePost(stagedPost, user);
+  equal(result, true, "it returns true");
   equal(topic.get('highest_post_number'), 2, "it updates the highest_post_number");
   ok(postStream.get('loading'), "it is loading while the post is being staged");
 
@@ -290,10 +312,15 @@ test("staging and committing a post", function() {
   topic.set('posts_count', 1);
 
   // Stage the new post in the stream
-  postStream.stagePost(stagedPost, user);
+  var result = postStream.stagePost(stagedPost, user);
+  equal(result, true, "it returns true");
+
   ok(postStream.get('loading'), "it is loading while the post is being staged");
   stagedPost.setProperties({ id: 1234, raw: "different raw value" });
   equal(postStream.get('filteredPostsCount'), 1, "it retains the filteredPostsCount");
+
+  result = postStream.stagePost(stagedPost, user);
+  equal(result, false, "you can't stage a post while it is currently staging");
 
   postStream.commitPost(stagedPost);
   ok(postStream.get('posts').contains(stagedPost), "the post is still in the stream");
@@ -306,7 +333,6 @@ test("staging and committing a post", function() {
   equal(found.get('raw'), 'different raw value', 'it also updated the value in the stream');
 
 });
-
 
 test('triggerNewPostInStream', function() {
   var postStream = buildStream(225566);
@@ -334,5 +360,39 @@ test('triggerNewPostInStream', function() {
   postStream.appendPost(Discourse.Post.create({id: 1, post_number: 2}));
   postStream.triggerNewPostInStream(2);
   ok(postStream.appendMore.calledOnce, "delegates to appendMore because the last post is loaded");
+});
+
+
+test("lastPostLoaded when the id changes", function() {
+  // This can happen in a race condition between staging a post and it coming through on the
+  // message bus. If the id of a post changes we should reconsider the lastPostLoaded property.
+  var postStream = buildStream(10101, [1, 2]);
+  var postWithoutId = Discourse.Post.create({ raw: 'hello world this is my new post' });
+
+  postStream.appendPost(Discourse.Post.create({id: 1, post_number: 1}));
+  postStream.appendPost(postWithoutId);
+  ok(!postStream.get('lastPostLoaded'), 'the last post is not loaded');
+
+  postWithoutId.set('id', 2);
+  ok(postStream.get('lastPostLoaded'), 'the last post is loaded now that the post has an id');
+});
+
+test("comitting and triggerNewPostInStream race condition", function() {
+  var postStream = buildStream(4964);
+
+  postStream.appendPost(Discourse.Post.create({id: 1, post_number: 1}));
+  var user = Discourse.User.create({username: 'eviltrout', name: 'eviltrout', id: 321});
+  var stagedPost = Discourse.Post.create({ raw: 'hello world this is my new post' });
+
+  var result = postStream.stagePost(stagedPost, user);
+  equal(postStream.get('filteredPostsCount'), 0, "it has no filteredPostsCount yet");
+  stagedPost.set('id', 123);
+
+  this.stub(postStream, 'appendMore');
+  postStream.triggerNewPostInStream(123);
+  equal(postStream.get('filteredPostsCount'), 1, "it added the post");
+
+  postStream.commitPost(stagedPost);
+  equal(postStream.get('filteredPostsCount'), 1, "it does not add the same post twice");
 });
 

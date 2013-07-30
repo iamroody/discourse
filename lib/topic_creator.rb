@@ -2,6 +2,10 @@ class TopicCreator
 
   attr_accessor :errors
 
+  def self.create(user, guardian, opts)
+    self.new(user, guardian, opts).create
+  end
+
   def initialize(user, guardian, opts)
     @user = user
     @guardian = guardian
@@ -17,19 +21,27 @@ class TopicCreator
     process_private_message if @opts[:archetype] == Archetype.private_message
     save_topic
 
+    watch_topic
+
     @topic
   end
 
   private
+
+  def watch_topic
+    unless @opts[:auto_track] == false
+      @topic.notifier.watch_topic!(@topic.user_id)
+    end
+  end
 
   def setup
     topic_params = {title: @opts[:title], user_id: @user.id, last_post_user_id: @user.id}
     topic_params[:archetype] = @opts[:archetype] if @opts[:archetype].present?
     topic_params[:subtype] = @opts[:subtype] if @opts[:subtype].present?
 
-    @guardian.ensure_can_create!(Topic)
-
     category = Category.where(name: @opts[:category]).first
+
+    @guardian.ensure_can_create!(Topic,category)
     topic_params[:category_id] = category.id if category.present?
     topic_params[:meta_data] = @opts[:meta_data] if @opts[:meta_data].present?
     topic_params[:created_at] = Time.zone.parse(@opts[:created_at].to_s) if @opts[:created_at].present?

@@ -111,7 +111,7 @@ zh_CN:
               cant_send_pm: "抱歉，你不能向该用户发送私信。"
 
   user_profile:
-    no_info_me: "<div class='missing-profile'>你的介绍信息中，“关于我”部分目前还是空白，<a href='/users/%{username_lower}/preferences'>介绍一下你自己，好不好？</a></div>"
+    no_info_me: "<div class='missing-profile'>你的介绍信息中，“关于我”部分目前还是空白，<a href='/users/%{username_lower}/preferences/about-me'>介绍一下你自己，好不好？</a></div>"
     no_info_other: "<div class='missing-profile'>%{name} 尚未在他/她的介绍中的“关于我”部分填写任何信息</div>"
 
   category:
@@ -575,7 +575,7 @@ zh_CN:
     min_body_similar_length: "开始检查相似主题的帖子内容的最小长度"
 
     category_colors: "设置分类颜色的用'|'分隔的十六进制色彩值列表"
-    max_upload_size_kb: "允许用户上传的最大文件大小(以kB为单位) - 确保在nginx(client_max_body_size), apache或代理服务中进行限制文件大小的配置."
+    max_image_size_kb: "允许用户上传的最大文件大小(以kB为单位) - 确保在nginx(client_max_body_size), apache或代理服务中进行限制文件大小的配置."
     max_similar_results: "当用户撰写新主题时，显示多少类似主题给用户"
 
     title_prettify: "防止常见标题里的错别字和错误，包括全部大写，第一个字符小写，多个！和？，结尾多余的. 等等。"
@@ -934,7 +934,7 @@ zh_CN:
 
   upload:
     pasted_image_filename: ""
-    image:
+    images:
       fetch_failure: "抱歉，获取图片時发生错误。"
       unknown_image_type: "抱歉，你上传的文件似乎不是一张图片。"
       size_not_found: "抱歉，我们无法获取图片大小，请检查你的图片是否已损坏。"

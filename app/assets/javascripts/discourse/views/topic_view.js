@@ -9,14 +9,16 @@
 **/
 Discourse.TopicView = Discourse.View.extend(Discourse.Scrolling, {
   templateName: 'topic',
-  topicBinding: 'controller.content',
+  topicBinding: 'controller.model',
   userFiltersBinding: 'controller.userFilters',
-  classNameBindings: ['controller.multiSelect:multi-select', 'topic.archetype', 'topic.category.secure:secure_category'],
+  classNameBindings: ['controller.multiSelect:multi-select',
+                      'topic.archetype',
+                      'topic.category.secure:secure_category',
+                      'topic.deleted:deleted-topic'],
   menuVisible: true,
   SHORT_POST: 1200,
 
   postStream: Em.computed.alias('controller.postStream'),
-
 
   updateBar: function() {
     var $topicProgress = $('#topic-progress');
@@ -48,6 +50,22 @@ Discourse.TopicView = Discourse.View.extend(Discourse.Scrolling, {
 
     var postUrl = topic.get('url');
     if (current > 1) { postUrl += "/" + current; }
+    // TODO: @Robin, this should all be integrated into the router,
+    //  the view should not be performing routing work
+    //
+    //  This workaround ensures the router is aware the route changed,
+    //    without it, the up button was broken on long topics.
+    //  To repro, go to a topic with 50 posts, go to first post,
+    //    scroll to end, click up button ... nothing happens
+    var handler =_.first(
+          _.where(Discourse.URL.get("router.router.currentHandlerInfos"),
+              function(o) {
+                return o.name === "topic.fromParams";
+              })
+          );
+    if(handler){
+      handler.context = {nearPost: current};
+    }
     Discourse.URL.replaceState(postUrl);
   }.observes('controller.currentPost', 'highest_post_number'),
 
@@ -124,17 +142,6 @@ Discourse.TopicView = Discourse.View.extend(Discourse.Scrolling, {
     this.debounceLoadSuggested();
   }.observes('topicTrackingState.incomingCount'),
 
-  resetRead: function(e) {
-    Discourse.ScreenTrack.instance().reset();
-    this.get('controller').unsubscribe();
-
-    var topicView = this;
-    this.get('topic').resetRead().then(function() {
-      topicView.set('controller.message', Em.String.i18n("topic.read_position_reset"));
-      topicView.set('controller.loaded', false);
-    });
-  },
-
   gotFocus: function(){
     if (Discourse.get('hasFocus')){
       this.scrolled();
@@ -152,7 +159,6 @@ Discourse.TopicView = Discourse.View.extend(Discourse.Scrolling, {
 
   // Called for every post seen, returns the post number
   postSeen: function($post) {
-
     var post = this.getPost($post);
 
     if (post) {
@@ -289,7 +295,7 @@ Discourse.TopicView = Discourse.View.extend(Discourse.Scrolling, {
 
   browseMoreMessage: function() {
     var opts = {
-      latestLink: "<a href=\"/\">" + (Em.String.i18n("topic.view_latest_topics")) + "</a>"
+      latestLink: "<a href=\"/\">" + (I18n.t("topic.view_latest_topics")) + "</a>"
     };
 
 
@@ -297,7 +303,7 @@ Discourse.TopicView = Discourse.View.extend(Discourse.Scrolling, {
     if (category) {
       opts.catLink = Discourse.Utilities.categoryLink(category);
     } else {
-      opts.catLink = "<a href=\"" + Discourse.getURL("/categories") + "\">" + (Em.String.i18n("topic.browse_all_categories")) + "</a>";
+      opts.catLink = "<a href=\"" + Discourse.getURL("/categories") + "\">" + (I18n.t("topic.browse_all_categories")) + "</a>";
     }
 
     var tracking = this.get('topicTrackingState');
@@ -318,9 +324,9 @@ Discourse.TopicView = Discourse.View.extend(Discourse.Scrolling, {
       });
     }
     else if (category) {
-      return Ember.String.i18n("topic.read_more_in_category", opts);
+      return I18n.t("topic.read_more_in_category", opts);
     } else {
-      return Ember.String.i18n("topic.read_more", opts);
+      return I18n.t("topic.read_more", opts);
     }
   }.property('topicTrackingState.messageCount')
 
@@ -346,7 +352,6 @@ Discourse.TopicView.reopenClass({
         var header = $('header');
         var title = $('#topic-title');
         var expectedOffset = title.height() - header.find('.contents').height();
-        console.log(expectedOffset);
 
         if (expectedOffset < 0) {
           expectedOffset = 0;

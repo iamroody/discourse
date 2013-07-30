@@ -22,7 +22,6 @@ class UserAction < ActiveRecord::Base
   ORDER = Hash[*[
     GOT_PRIVATE_MESSAGE,
     NEW_PRIVATE_MESSAGE,
-    BOOKMARK,
     NEW_TOPIC,
     REPLY,
     RESPONSE,
@@ -30,6 +29,7 @@ class UserAction < ActiveRecord::Base
     WAS_LIKED,
     MENTION,
     QUOTE,
+    BOOKMARK,
     STAR,
     EDIT
   ].each_with_index.to_a.flatten]
@@ -94,7 +94,8 @@ SELECT
   u.email acting_email, u.username acting_username, u.name acting_name, u.id acting_user_id,
   coalesce(p.cooked, p2.cooked) cooked,
   CASE WHEN coalesce(p.deleted_at, p2.deleted_at, t.deleted_at) IS NULL THEN false ELSE true END deleted,
-  p.hidden
+  p.hidden,
+  p.post_type
 FROM user_actions as a
 JOIN topics t on t.id = a.target_topic_id
 LEFT JOIN posts p on p.id = a.target_post_id
@@ -141,8 +142,8 @@ SELECT
   pu.email acting_email, pu.username acting_username, pu.name acting_name, pu.id acting_user_id,
   p.cooked,
   CASE WHEN coalesce(p.deleted_at, t.deleted_at) IS NULL THEN false ELSE true END deleted,
-  p.hidden
-
+  p.hidden,
+  p.post_type
 FROM topics t
 JOIN posts p ON p.topic_id =  t.id and p.post_number = t.highest_post_number
 JOIN users pu ON pu.id = p.user_id
@@ -162,10 +163,16 @@ ORDER BY p.created_at desc
   end
 
   def self.log_action!(hash)
-    require_parameters(hash, :action_type, :user_id, :acting_user_id, :target_topic_id, :target_post_id)
+    required_parameters = [:action_type, :user_id, :acting_user_id, :target_topic_id, :target_post_id]
+    require_parameters(hash, *required_parameters)
     transaction(requires_new: true) do
       begin
-        action = new(hash)
+
+        # protect against dupes, for some reason this is failing in some cases
+        action = self.where(hash.select{|k,v| required_parameters.include?(k)}).first
+        return action if action
+
+        action = self.new(hash)
 
         if hash[:created_at]
           action.created_at = hash[:created_at]
@@ -179,7 +186,7 @@ ORDER BY p.created_at desc
 
         # move into Topic perhaps
         group_ids = nil
-        if topic && topic.category && topic.category.secure
+        if topic && topic.category && topic.category.read_restricted
           group_ids = topic.category.groups.pluck("groups.id")
         end
 
@@ -187,6 +194,7 @@ ORDER BY p.created_at desc
                               action.id,
                               user_ids: [user_id],
                               group_ids: group_ids )
+        action
 
       rescue ActiveRecord::RecordNotUnique
         # can happen, don't care already logged
@@ -203,6 +211,45 @@ ORDER BY p.created_at desc
     end
 
     update_like_count(hash[:user_id], hash[:action_type], -1)
+  end
+
+  def self.synchronize_target_topic_ids(post_ids = nil)
+
+    # nuke all dupes, using magic
+    builder = SqlBuilder.new <<SQL
+DELETE FROM user_actions USING user_actions ua2
+/*where*/
+SQL
+
+    builder.where <<SQL
+  user_actions.action_type = ua2.action_type AND
+  user_actions.user_id = ua2.user_id AND
+  user_actions.acting_user_id = ua2.acting_user_id AND
+  user_actions.target_post_id = ua2.target_post_id AND
+  user_actions.target_post_id > 0 AND
+  user_actions.id > ua2.id
+SQL
+
+    if post_ids
+      builder.where("user_actions.target_post_id in (:post_ids)", post_ids: post_ids)
+    end
+
+    builder.exec
+
+    builder = SqlBuilder.new("UPDATE user_actions
+                    SET target_topic_id = (select topic_id from posts where posts.id = target_post_id)
+                    /*where*/")
+
+    builder.where("target_topic_id <> (select topic_id from posts where posts.id = target_post_id)")
+    if post_ids
+      builder.where("target_post_id in (:post_ids)", post_ids: post_ids)
+    end
+
+    builder.exec
+  end
+
+  def self.ensure_consistency!
+    self.synchronize_target_topic_ids
   end
 
   protected
@@ -232,11 +279,11 @@ ORDER BY p.created_at desc
     unless guardian.is_staff?
       allowed = guardian.secure_category_ids
       if allowed.present?
-        builder.where("( c.secure IS NULL OR
-                         c.secure = 'f' OR
-                        (c.secure = 't' and c.id in (:cats)) )", cats: guardian.secure_category_ids )
+        builder.where("( c.read_restricted IS NULL OR
+                         NOT c.read_restricted OR
+                        (c.read_restricted and c.id in (:cats)) )", cats: guardian.secure_category_ids )
       else
-        builder.where("(c.secure IS NULL OR c.secure = 'f')")
+        builder.where("(c.read_restricted IS NULL OR NOT c.read_restricted)")
       end
     end
   end

@@ -10,6 +10,7 @@ class Group < ActiveRecord::Base
   validate :name_format_validator
 
   AUTO_GROUPS = {
+    :everyone => 0,
     :admins => 1,
     :moderators => 2,
     :staff => 3,
@@ -27,12 +28,17 @@ class Group < ActiveRecord::Base
   def self.refresh_automatic_group!(name)
 
     id = AUTO_GROUPS[name]
+    return unless id
 
     unless group = self.lookup_group(name)
       group = Group.new(name: name.to_s, automatic: true)
       group.id = id
       group.save!
     end
+
+    # the everyone group is special, it can include non-users so there is no
+    # way to have the membership in a table
+    return group if name == :everyone
 
     group.name = I18n.t("groups.default_names.#{name}")
 
@@ -88,8 +94,15 @@ class Group < ActiveRecord::Base
   end
 
   def self.lookup_group(name)
-    raise ArgumentError, "unknown group" unless id = AUTO_GROUPS[name]
-    Group.where(id: id).first
+    id = AUTO_GROUPS[name]
+    if id
+      Group.where(id: id).first
+    else
+      unless group = Group.where(name: name).first
+        raise ArgumentError, "unknown group" unless group
+      end
+      group
+    end
   end
 
 

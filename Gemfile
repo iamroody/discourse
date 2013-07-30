@@ -1,13 +1,74 @@
 #source 'https://rubygems.org'
 source 'http://ruby.taobao.org'
 
-gem 'active_model_serializers', git: 'https://github.com/rails-api/active_model_serializers.git'
+# monkey patching to support dual booting
+module Bundler::SharedHelpers
+  def default_lockfile=(path)
+    @default_lockfile = path
+  end
+  def default_lockfile
+    @default_lockfile ||= Pathname.new("#{default_gemfile}.lock")
+  end
+end
+
+module ::Kernel
+  def rails4?
+    !!ENV["RAILS4"]
+  end
+end
+
+if rails4?
+  Bundler::SharedHelpers.default_lockfile = Pathname.new("#{Bundler::SharedHelpers.default_gemfile}_rails4.lock")
+
+  # Bundler::Dsl.evaluate already called with an incorrect lockfile ... fix it
+  class Bundler::Dsl
+    # A bit messy, this can be called multiple times by bundler, avoid blowing the stack
+    unless self.method_defined? :to_definition_unpatched
+      alias_method :to_definition_unpatched, :to_definition
+      puts "Booting in Rails 4 mode"
+    end
+    def to_definition(bad_lockfile, unlock)
+      to_definition_unpatched(Bundler::SharedHelpers.default_lockfile, unlock)
+    end
+  end
+end
+
+if rails4?
+  gem 'rails', '4.0.0'
+  gem 'redis-rails', :git => 'git://github.com/SamSaffron/redis-store.git'
+  gem 'rails-observers'
+  gem 'actionpack-action_caching'
+  gem 'seed-fu' , github: 'mbleigh/seed-fu'
+  gem 'spork-rails', :github => 'sporkrb/spork-rails'
+else
+  # we had pain with the 3.2.13 upgrade so monkey patch the security fix
+  # next time around we hope to upgrade
+  gem 'rails', '3.2.12'
+  gem 'strong_parameters' # remove when we upgrade to Rails 4
+  # we are using a custom sprockets repo to work around: https://github.com/rails/rails/issues/8099#issuecomment-16137638
+  # REVIEW EVERY RELEASE
+  gem 'sprockets', git: 'https://github.com/SamSaffron/sprockets.git', branch: 'rails-compat'
+  gem 'redis-rails'
+  gem 'seed-fu'
+  gem 'activerecord-postgres-hstore'
+  gem 'active_attr'
+
+  # not compatible, but we don't really use guard much anymore anyway
+  # instead we use bundle exec rake autospec
+  gem 'guard-spork', require: false
+end
+
+gem 'redis'
+gem 'hiredis'
+gem 'em-redis'
+
+gem 'active_model_serializers'
 
 # we had issues with latest, stick to the rev till we figure this out
 # PR that makes it all hang together welcome
 gem 'ember-rails'
-gem 'ember-source', '1.0.0.rc5' # or the version you need
-gem 'handlebars-source', '1.0.0.rc4' # or the version you need
+gem 'ember-source', '1.0.0.rc6.2'
+gem 'handlebars-source', '1.0.12'
 gem 'barber'
 
 gem 'vestal_versions', git: 'https://github.com/zhangyuan/vestal_versions'
@@ -17,17 +78,13 @@ gem 'rails_multisite', path: 'vendor/gems/rails_multisite'
 gem 'simple_handlebars_rails', path: 'vendor/gems/simple_handlebars_rails'
 
 gem 'redcarpet', require: false
-gem 'activerecord-postgres-hstore'
-gem 'active_attr' # until we get ActiveModel::Model with Rails 4
 gem 'airbrake', '3.1.2', require: false # errbit is broken with 3.1.3 for now
 gem 'clockwork', require: false
-gem 'em-redis'
 gem 'eventmachine'
 gem 'fast_xs'
 gem 'fast_xor', git: 'https://github.com/CodeMonkeySteve/fast_xor.git'
 gem 'fastimage'
 gem 'fog', require: false
-gem 'hiredis'
 
 gem 'email_reply_parser', git: 'https://github.com/lawrencepit/email_reply_parser.git'
 
@@ -50,25 +107,20 @@ gem 'omniauth-browserid', git: 'https://github.com/callahad/omniauth-browserid.g
 gem 'omniauth-cas'
 gem 'oj'
 gem 'pg'
-# we had pain with the 3.2.13 upgrade so monkey patch the security fix
-# next time around we hope to upgrade
-gem 'rails', '3.2.12'
 gem 'rake'
-gem 'redis'
-gem 'redis-rails'
+
+
 gem 'rest-client'
 gem 'rinku'
 gem 'sanitize'
 gem 'sass'
-gem 'seed-fu'
 gem 'sidekiq'
 gem 'sidekiq-failures'
 gem 'sinatra', require: nil
 gem 'slim'  # required for sidekiq-web
-gem 'strong_parameters' # remove when we upgrade to Rails 4
 gem 'therubyracer', require: 'v8'
 gem 'thin', require: false
-gem 'diffy', require: false
+gem 'diffy', '>= 3.0', require: false
 gem 'highline', require: false
 
 # Gem that enables support for plugins. It is required.
@@ -97,12 +149,16 @@ group :test do
 end
 
 group :test, :development do
+  gem 'mock_redis'
   gem 'listen', require: false
   gem 'certified', require: false
-  gem 'fabrication', require: false
+  if rails4?
+    gem 'fabrication', github: 'paulelliott/fabrication', require: false
+  else
+    gem 'fabrication', require: false
+  end
   gem 'qunit-rails'
   gem 'guard-rspec', require: false
-  gem 'guard-spork', require: false
   gem 'mocha', require: false
   gem 'rb-fsevent', require: RUBY_PLATFORM =~ /darwin/i ? 'rb-fsevent' : false
   gem 'rb-inotify', '~> 0.9', require: RUBY_PLATFORM =~ /linux/i ? 'rb-inotify' : false
@@ -126,9 +182,6 @@ group :development do
   gem 'capistrano-rbenv', require: false
 end
 
-# we are using a custom sprockets repo to work around: https://github.com/rails/rails/issues/8099#issuecomment-16137638
-# REVIEW EVERY RELEASE
-gem 'sprockets', git: 'https://github.com/SamSaffron/sprockets.git', branch: 'rails-compat'
 
 
 # this is an optional gem, it provides a high performance replacement

@@ -12,7 +12,13 @@ class UsersController < ApplicationController
   #  page is going to be empty, this means that server will see an invalid CSRF and blow the session
   #  once that happens you can't log in with social
   skip_before_filter :verify_authenticity_token, only: [:create]
-  skip_before_filter :redirect_to_login_if_required, only: [:check_username,:create,:get_honeypot_value,:activate_account,:send_activation_email,:authorize_email]
+  skip_before_filter :redirect_to_login_if_required, only: [:check_username,
+                                                            :create,
+                                                            :get_honeypot_value,
+                                                            :activate_account,
+                                                            :send_activation_email,
+                                                            :authorize_email,
+                                                            :password_reset]
 
   def show
     @user = fetch_user_from_params
@@ -188,7 +194,9 @@ class UsersController < ApplicationController
     else
       render json: {
         success: false,
-        message: I18n.t("login.errors", errors: user.errors.full_messages.join("\n"))
+        message: I18n.t("login.errors", errors: user.errors.full_messages.join("\n")),
+        errors: user.errors.to_hash,
+        values: user.attributes.slice("name", "username", "email")
       }
     end
   rescue ActiveRecord::StatementInvalid

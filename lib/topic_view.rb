@@ -1,5 +1,6 @@
 require_dependency 'guardian'
 require_dependency 'topic_query'
+require_dependency 'filter_best_posts'
 require_dependency 'summarize'
 
 class TopicView
@@ -8,42 +9,27 @@ class TopicView
   attr_accessor :draft, :draft_key, :draft_sequence
 
   def initialize(topic_id, user=nil, options={})
+    @user = user
     @topic = find_topic(topic_id)
-    raise Discourse::NotFound if @topic.blank?
-
-    @guardian = Guardian.new(user)
-
-    # Special case: If the topic is private and the user isn't logged in, ask them
-    # to log in!
-    if @topic.present? && @topic.private_message? && user.blank?
-      raise Discourse::NotLoggedIn.new
-    end
-
-    guardian.ensure_can_see!(@topic)
+    @guardian = Guardian.new(@user)
+    check_and_raise_exceptions
 
     @post_number, @page = options[:post_number], options[:page].to_i
     @page = 1 if @page == 0
 
     @limit = options[:limit] || SiteSetting.posts_per_page;
+    @username_filters = options[:username_filters]
+    @best = options[:best]
+    @filter = options[:filter]
+    setup_filtered_posts
 
-    @filtered_posts = @topic.posts
-    @filtered_posts = @filtered_posts.with_deleted if user.try(:staff?)
-    @filtered_posts = @filtered_posts.best_of if options[:filter] == 'best_of'
-    @filtered_posts = @filtered_posts.where('posts.post_type <> ?', Post.types[:moderator_action]) if options[:best].present?
-
-    if options[:username_filters].present?
-      usernames = options[:username_filters].map{|u| u.downcase}
-      @filtered_posts = @filtered_posts.where('post_number = 1 or user_id in (select u.id from users u where username_lower in (?))', usernames)
-    end
-
-    @user = user
     @initial_load = true
     @index_reverse = false
 
     filter_posts(options)
 
     @draft_key = @topic.draft_key
-    @draft_sequence = DraftSequence.current(user, @draft_key)
+    @draft_sequence = DraftSequence.current(@user, @draft_key)
   end
 
   def canonical_path
@@ -86,14 +72,23 @@ class TopicView
     @topic.title
   end
 
-  def summary
+  def desired_post
+    return @desired_post if @desired_post.present?
     return nil if posts.blank?
-    Summarize.new(posts.first.cooked).summary
+
+    @desired_post = posts.detect {|p| p.post_number == @post_number.to_i}
+    @desired_post ||= posts.first
+    @desired_post
+  end
+
+  def summary
+    return nil if desired_post.blank?
+    Summarize.new(desired_post.cooked).summary
   end
 
   def image_url
-    return nil if posts.blank?
-    posts.first.user.small_avatar_url
+    return nil if desired_post.blank?
+    desired_post.user.small_avatar_url
   end
 
   def filter_posts(opts = {})
@@ -156,44 +151,9 @@ class TopicView
 
 
   def filter_best(max, opts={})
-    if opts[:min_replies] && @topic.posts_count < opts[:min_replies] + 1
-      @posts = []
-      return
-    end
-
-
-    if opts[:only_moderator_liked]
-      liked_by_moderators = PostAction.where(post_id: @filtered_posts.pluck(:id), post_action_type_id: PostActionType.types[:like])
-      liked_by_moderators = liked_by_moderators.joins(:user).where('users.moderator').pluck(:post_id)
-      @filtered_posts = @filtered_posts.where(id: liked_by_moderators)
-    end
-
-    @posts = @filtered_posts.order('percent_rank asc, sort_order asc').where("post_number > 1")
-    @posts = @posts.includes(:reply_to_user).includes(:topic).joins(:user).limit(max)
-
-    min_trust_level = opts[:min_trust_level]
-    if min_trust_level && min_trust_level > 0
-
-      bypass_trust_level_score = opts[:bypass_trust_level_score]
-
-      if bypass_trust_level_score && bypass_trust_level_score > 0
-        @posts = @posts.where('COALESCE(users.trust_level,0) >= ? OR posts.score >= ?',
-                    min_trust_level,
-                    bypass_trust_level_score
-                 )
-      else
-        @posts = @posts.where('COALESCE(users.trust_level,0) >= ?', min_trust_level)
-      end
-    end
-
-    min_score = opts[:min_score]
-    if min_score && min_score > 0
-      @posts = @posts.where('posts.score >= ?', min_score)
-    end
-
-    @posts = @posts.to_a
-    @posts.sort!{|a,b| a.post_number <=> b.post_number}
-    @posts
+    filter = FilterBestPosts.new(@topic, @filtered_posts, max, opts)
+    @posts = filter.posts
+    @filtered_posts = filter.filtered_posts
   end
 
   def read?(post_number)
@@ -308,6 +268,29 @@ class TopicView
   end
 
   def find_topic(topic_id)
-    Topic.where(id: topic_id).includes(:category).first
+    finder = Topic.where(id: topic_id).includes(:category)
+    finder = finder.with_deleted if @user.try(:staff?)
+    finder.first
   end
+
+  def setup_filtered_posts
+    @filtered_posts = @topic.posts
+    @filtered_posts = @filtered_posts.with_deleted.without_nuked_users if @user.try(:staff?)
+    @filtered_posts = @filtered_posts.best_of if @filter == 'best_of'
+    @filtered_posts = @filtered_posts.where('posts.post_type <> ?', Post.types[:moderator_action]) if @best.present?
+    return unless @username_filters.present?
+    usernames = @username_filters.map{|u| u.downcase}
+    @filtered_posts = @filtered_posts.where('post_number = 1 or user_id in (select u.id from users u where username_lower in (?))', usernames)
+  end
+
+  def check_and_raise_exceptions
+    raise Discourse::NotFound if @topic.blank?
+    # Special case: If the topic is private and the user isn't logged in, ask them
+    # to log in!
+    if @topic.present? && @topic.private_message? && @user.blank?
+      raise Discourse::NotLoggedIn.new
+    end
+    guardian.ensure_can_see!(@topic)
+  end
+
 end

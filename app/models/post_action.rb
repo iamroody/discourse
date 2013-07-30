@@ -63,7 +63,7 @@ class PostAction < ActiveRecord::Base
       moderator_id == -1 ? PostActionType.auto_action_flag_types.values : PostActionType.flag_types.values
     end
 
-    PostAction.where({ post_id: post.id, post_action_type_id: actions }).update_all({ deleted_at: Time.zone.now, deleted_by: moderator_id })
+    PostAction.where({ post_id: post.id, post_action_type_id: actions }).update_all({ deleted_at: Time.zone.now, deleted_by_id: moderator_id })
     f = actions.map{|t| ["#{PostActionType.types[t]}_count", 0]}
     Post.where(id: post.id).with_deleted.update_all(Hash[*f.flatten])
     update_flagged_posts_count
@@ -140,13 +140,13 @@ class PostAction < ActiveRecord::Base
                       user_id: user.id,
                       post_action_type_id:
                       post_action_type_id).first
-      action.trash!
+      action.trash!(user)
       action.run_callbacks(:save)
     end
   end
 
   def remove_act!(user)
-    trash!
+    trash!(user)
     run_callbacks(:save)
   end
 
@@ -334,6 +334,7 @@ class PostAction < ActiveRecord::Base
       post = post_lookup[pa.post_id]
       post.post_actions ||= []
       action = pa.attributes
+      action[:name_key] = PostActionType.types.key(pa.post_action_type_id)
       if (pa.related_post && pa.related_post.topic)
         action.merge!(topic_id: pa.related_post.topic_id,
                      slug: pa.related_post.topic.slug,
@@ -345,7 +346,7 @@ class PostAction < ActiveRecord::Base
 
     # TODO add serializer so we can skip this
     posts.map!(&:marshal_dump)
-    [posts, User.select([:id, :username, :email]).where(id: users.to_a).all]
+    [posts, User.where(id: users.to_a).to_a]
   end
 
   protected
@@ -390,7 +391,7 @@ end
 #  deleted_at          :datetime
 #  created_at          :datetime         not null
 #  updated_at          :datetime         not null
-#  deleted_by          :integer
+#  deleted_by_id       :integer
 #  message             :text
 #  related_post_id     :integer
 #  staff_took_action   :boolean          default(FALSE), not null

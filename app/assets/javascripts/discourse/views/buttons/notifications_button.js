@@ -7,8 +7,10 @@
   @module Discourse
 **/
 Discourse.NotificationsButton = Discourse.DropdownButtonView.extend({
-  title: Em.String.i18n('topic.notifications.title'),
+  title: I18n.t('topic.notifications.title'),
   longDescriptionBinding: 'topic.details.notificationReasonText',
+  topic: Em.computed.alias('controller.model'),
+  hidden: Em.computed.alias('topic.deleted'),
 
   dropDownContent: [
     [Discourse.Topic.NotificationLevel.WATCHING, 'topic.notifications.watching'],
@@ -35,7 +37,7 @@ Discourse.NotificationsButton = Discourse.DropdownButtonView.extend({
         case 'muted': return '<i class="icon-remove-sign"></i>&nbsp;';
       }
     })();
-    return icon + (Ember.String.i18n("topic.notifications." + key + ".title")) + "<span class='caret'></span>";
+    return icon + (I18n.t("topic.notifications." + key + ".title")) + "<span class='caret'></span>";
   }.property('topic.details.notification_level'),
 
   clicked: function(id) {

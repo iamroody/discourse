@@ -16,8 +16,20 @@ class CookedPostProcessor
   end
 
   def post_process
+    post_process_attachments
     post_process_images
     post_process_oneboxes
+  end
+
+  def post_process_attachments
+    attachments.each do |attachment|
+      href = attachment['href']
+      attachment['href'] = relative_to_absolute(href)
+      # update reverse index
+      if upload = Upload.get_from_url(href)
+        associate_to_post(upload)
+      end
+    end
   end
 
   def post_process_images
@@ -33,7 +45,7 @@ class CookedPostProcessor
         # make sure the img has proper width and height attributes
         update_dimensions!(img)
         # retrieve the associated upload, if any
-        if upload = Upload.get_from_url(img['src'])
+        if upload = Upload.get_from_url(src)
           # update reverse index
           associate_to_post(upload)
         end
@@ -152,7 +164,7 @@ class CookedPostProcessor
 
     filename = get_filename(upload, img['src'])
     informations = "#{original_width}x#{original_height}"
-    informations << " | #{number_to_human_size(upload.filesize)}" if upload
+    informations << " #{number_to_human_size(upload.filesize)}" if upload
 
     meta.add_child create_span_node("filename", filename)
     meta.add_child create_span_node("informations", informations)
@@ -207,6 +219,17 @@ class CookedPostProcessor
     uri = URI.parse(url)
     %w(http https).include? uri.scheme
   rescue URI::InvalidURIError
+  end
+
+  def attachments
+    if SiteSetting.enable_s3_uploads?
+      @doc.css("a.attachment[href^=\"#{S3Store.base_url}\"]")
+    else
+      # local uploads are identified using a relative uri
+      @doc.css("a.attachment[href^=\"#{LocalStore.directory}\"]") +
+      # when cdn is enabled, we have the whole url
+      @doc.css("a.attachment[href^=\"#{LocalStore.base_url}\"]")
+    end
   end
 
   def dirty?

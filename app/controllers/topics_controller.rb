@@ -9,6 +9,7 @@ class TopicsController < ApplicationController
                                           :update,
                                           :star,
                                           :destroy,
+                                          :recover,
                                           :status,
                                           :invite,
                                           :mute,
@@ -25,6 +26,7 @@ class TopicsController < ApplicationController
   caches_action :avatar, cache_path: Proc.new {|c| "#{c.params[:post_number]}-#{c.params[:topic_id]}" }
 
   def show
+
     # We'd like to migrate the wordpress feed to another url. This keeps up backwards compatibility with
     # existing installs.
     return wordpress if params[:best].present?
@@ -33,6 +35,7 @@ class TopicsController < ApplicationController
     begin
       @topic_view = TopicView.new(params[:id] || params[:topic_id], current_user, opts)
     rescue Discourse::NotFound
+      Rails.logger.info ">>>> B"
       topic = Topic.where(slug: params[:id]).first if params[:id]
       raise Discourse::NotFound unless topic
       return redirect_to(topic.relative_url)
@@ -124,7 +127,7 @@ class TopicsController < ApplicationController
 
     # Only suggest similar topics if the site has a minimmum amount of topics present.
     if Topic.count > SiteSetting.minimum_topics_similar
-      topics = Topic.similar_to(title, raw, current_user)
+      topics = Topic.similar_to(title, raw, current_user).to_a
     end
 
     render_serialized(topics, BasicTopicSerializer)
@@ -169,7 +172,14 @@ class TopicsController < ApplicationController
   def destroy
     topic = Topic.where(id: params[:id]).first
     guardian.ensure_can_delete!(topic)
-    topic.trash!
+    topic.trash!(current_user)
+    render nothing: true
+  end
+
+  def recover
+    topic = Topic.where(id: params[:topic_id]).with_deleted.first
+    guardian.ensure_can_recover_topic!(topic)
+    topic.recover!
     render nothing: true
   end
 
@@ -190,12 +200,20 @@ class TopicsController < ApplicationController
   end
 
   def invite
-    params.require(:user)
+    username_or_email = params[:user]
+    if username_or_email
+      # provides a level of protection for hashes
+      params.require(:user)
+    else
+      params.require(:email)
+      username_or_email = params[:email]
+    end
+
     topic = Topic.where(id: params[:topic_id]).first
     guardian.ensure_can_invite_to!(topic)
 
-    if topic.invite(current_user, params[:user])
-      user = User.find_by_username_or_email(params[:user])
+    if topic.invite(current_user, username_or_email)
+      user = User.find_by_username_or_email(username_or_email)
       if user
         render_json_dump BasicUserSerializer.new(user, scope: guardian, root: 'user')
       else

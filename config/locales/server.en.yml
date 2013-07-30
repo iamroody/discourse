@@ -39,6 +39,10 @@ en:
     zero: "Sorry, new users can't put images in posts."
     one: "Sorry, new users can only put one image in a post."
     other: "Sorry, new users can only put %{count} images in a post."
+  too_many_attachments:
+    zero: "Sorry, new users can't put attachments in posts."
+    one: "Sorry, new users can only put one attachment in a post."
+    other: "Sorry, new users can only put %{count} attachments in a post."
   too_many_links:
     zero: "Sorry, new users can't put links in posts."
     one: "Sorry, new users can only put one link in a post."
@@ -118,13 +122,13 @@ en:
               cant_send_pm: "Sorry, you cannot send a private message to that user."
 
   user_profile:
-    no_info_me: "<div class='missing-profile'>the About Me field of your profile is currently blank, <a href='/users/%{username_lower}/preferences'>would you like to fill it out?</a></div>"
+    no_info_me: "<div class='missing-profile'>the About Me field of your profile is currently blank, <a href='/users/%{username_lower}/preferences/about-me'>would you like to fill it out?</a></div>"
     no_info_other: "<div class='missing-profile'>%{name} hasn't entered anything in the About Me field of their profile yet</div>"
 
   category:
     topic_prefix: "Category definition for %{category}"
     replace_paragraph: "[Replace this first paragraph with a short description of your new category. This guidance will appear in the category selection area, so try to keep it below 200 characters.]"
-    post_template: "%{replace_paragraph}\n\nUse this space for a longer description, as well as to establish any category guidelines or rules.\n\nSome things to consider in any discussion replies below:\n\n- What is this category for? Why should people select this category for their topic?\n\n- How is this different than the other categories we already have?\n\n- Do we need this category?\n\n- Should we merge this with another category, or split it into more categories?\n"
+    post_template: "%{replace_paragraph}\n\nUse the following paragraphs for a longer description, as well as to establish any category guidelines or rules.\n\nSome things to consider in any discussion replies below:\n\n- What is this category for? Why should people select this category for their topic?\n\n- How is this different than the other categories we already have?\n\n- Do we need this category?\n\n- Should we merge this with another category, or split it into more categories?\n"
 
   trust_levels:
     newuser:
@@ -141,7 +145,7 @@ en:
 
 
   rate_limiter:
-    too_many_requests: "You're doing that too often. Please wait %{time_left} before trying again."
+    too_many_requests: "We have a daily limit on how many times that action can be taken. Please wait %{time_left} before trying again."
     hours:
       one: "1 hour"
       other: "%{count} hours"
@@ -436,6 +440,9 @@ en:
     tos_miscellaneous:
       title: "Terms of Service: Miscellaneous"
       description: "The text for the Miscellaneous section of the Terms of Service."
+    login_required:
+      title: "Login Required: Homepage"
+      description: "The text displayed for unauthorized users when login is required on the site."
 
   site_settings:
     default_locale: "The default language of this Discourse instance (ISO 639-1 Code)"
@@ -458,7 +465,7 @@ en:
     company_short_name: "The short name of the company that runs this site, used in legal documents like the /tos"
     company_domain: "The domain name owned by the company that runs this site, used in legal documents like the /tos"
     api_key: "The secure API key used to create and update topics, use the /admin/api section to set it up"
-    queue_jobs: "Queue various jobs in sidekiq, if false queues are inline"
+    queue_jobs: "DEVELOPER ONLY! WARNING! By default, queue jobs in sidekiq. If disabled, your site will be broken."
     crawl_images: "Enable retrieving images from third party sources to insert width and height dimensions"
     ninja_edit_window: "Number of seconds after posting where edits do not create a new version"
     max_image_width: "Maximum allowed width of images in a post"
@@ -477,6 +484,7 @@ en:
     apple_touch_icon_url: "Icon used for Apple touch devices. Recommended size is 144px by 144px."
 
     notification_email: "The return email address used when sending system emails such as notifying users of lost passwords, new accounts etc"
+    email_custom_headers: "A pipe-delimited list of custom email headers"
     use_ssl: "Should the site be accessible via SSL? (NOT IMPLEMENTED, EXPERIMENTAL)"
     best_of_score_threshold: "The minimum score of a post to be included in the 'best of'"
     best_of_posts_required: "Minimum posts in a topic before 'best of' mode is enabled"
@@ -578,10 +586,12 @@ en:
     suggested_topics: "The number of suggested topics shown at the bottom of a topic"
 
     enable_s3_uploads: "Place uploads on Amazon S3"
-    s3_upload_bucket: "The Amazon S3 bucket name that files will be uploaded into"
+    s3_upload_bucket: "The Amazon S3 bucket name that files will be uploaded into. WARNING: must be lowercase (cf. http://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html)"
     s3_access_key_id: "The Amazon S3 access key id that will be used to upload images"
     s3_secret_access_key: "The Amazon S3 secret access key that will be used to upload images"
     s3_region: "The Amazon S3 region name that will be used to upload images"
+
+    enable_flash_video_onebox: "Enable embedding of swf and flv links in oneboxes (may introduce a security risk, caution advised)"
 
     default_invitee_trust_level: "Default trust level (0-4) for invited users"
     default_trust_level: "Default trust level (0-4) for users"
@@ -600,12 +610,14 @@ en:
 
     newuser_max_links: "How many links a new user can add to a post"
     newuser_max_images: "How many images a new user can add to a post"
+    newuser_max_attachments: "How many attachments a new user can add to a post"
     newuser_max_mentions_per_post: "Maximum number of @name notifications a new user can use in a post"
     max_mentions_per_post: "Maximum number of @name notifications you can use in a post"
 
     create_thumbnails: "Create thumbnails for lightboxed images"
 
     email_time_window_mins: "How many minutes we wait before sending a user mail, to give them a chance to see it first"
+    email_posts_context: "How many posts to include in emails to show context"
     flush_timings_secs: "How frequently we flush timing data to the server, in seconds"
     max_word_length: "The maximum allowed word length, in characters, in a topic title"
     title_min_entropy: "The minimum allowed entropy (unique characters, non-english count for more) required for a topic title"
@@ -617,7 +629,8 @@ en:
     min_body_similar_length: "The minimum length of a post's body before it will be checked for similar topics"
 
     category_colors: "A pipe (|) separated list of hexadecimal color values allowed for categories"
-    max_upload_size_kb: "The maximum size of files we allow users to upload in kB - be sure to configure the limit in nginx (client_max_body_size) / apache or proxy as well."
+    max_image_size_kb: "The maximum size of images we allow users to upload in kB - be sure to configure the limit in nginx (client_max_body_size) / apache or proxy as well."
+    max_attachment_size_kb: "The maximum size of files we allow users to upload in kB - be sure to configure the limit in nginx (client_max_body_size) / apache or proxy as well."
     authorized_extensions: "A pipe (|) separated list of file extensions allowed for upload"
     max_similar_results: "How many similar topics to show a user while they are composing a new topic"
 
@@ -644,6 +657,10 @@ en:
     pop3s_polling_password: "The password for the POP3S account to poll for email"
 
     minimum_topics_similar: "How many topics need to exist in the database before similar topics are presented."
+
+    relative_date_duration: "Number of days after posting where post dates will be shown as relative instead of absolute. Examples: relative date: 7d, absolute date: 20 Feb"
+    delete_user_max_age: "The maximum age of a user, in days, which can be deleted by an admin."
+    delete_all_posts_max: "The maximum number of posts that can be deleted at once with the Delete All Posts button. If a user has more than this many posts, the posts cannot all be deleted at once and the user can't be deleted."
 
 
   notification_types:
@@ -716,6 +733,7 @@ en:
       must_begin_with_alphanumeric: "must begin with a letter or number"
     email:
       not_allowed: "is not allowed from that email provider. Please use another email address."
+      blocked: "is not allowed."
 
   invite_mailer:
     subject_template: "[%{site_name}] %{invitee_name} invited you to join a discussion on %{site_name}"
@@ -919,12 +937,15 @@ en:
   unsubscribe_link: "To unsubscribe from these emails, visit your [user preferences](%{user_preferences_url})."
 
   user_notifications:
+    previous_discussion: "Previous discussion"
     unsubscribe:
       title: "Unsubscribe"
       description: "Not interested in getting these emails? No problem! Click below to unsubscribe instantly:"
 
     reply_by_email: "To respond, reply to this email or visit %{base_url}%{url} in your browser."
     visit_link_to_respond: "To respond, visit %{base_url}%{url} in your browser."
+
+    posted_by: "Posted by %{username} on %{post_date}"
 
     user_invited_to_private_message:
       subject_template: "[%{site_name}] %{username} invited you to a private message '%{topic_title}'"
@@ -934,12 +955,11 @@ en:
         Please visit this link to view the topic: %{base_url}%{url}
 
     user_replied:
-      subject_template: "[%{site_name}] %{username} replied to your post in '%{topic_title}'"
+      subject_template: "[%{site_name}] new reply to your post in '%{topic_title}'"
       text_body_template: |
-        %{username} replied to your post in '%{topic_title}' on %{site_name}:
-
-        ---
         %{message}
+
+        %{context}
 
         ---
         %{respond_instructions}
@@ -947,10 +967,9 @@ en:
     user_quoted:
       subject_template: "[%{site_name}] %{username} quoted you in '%{topic_title}'"
       text_body_template: |
-        %{username} quoted you in '%{topic_title}' on %{site_name}:
-
-        ---
         %{message}
+
+        %{context}
 
         ---
         %{respond_instructions}
@@ -958,21 +977,19 @@ en:
     user_mentioned:
       subject_template: "[%{site_name}] %{username} mentioned you in '%{topic_title}'"
       text_body_template: |
-        %{username} mentioned you in '%{topic_title}' on %{site_name}:
-
-        ---
         %{message}
+
+        %{context}
 
         ---
         %{respond_instructions}
 
     user_posted:
-      subject_template: "[%{site_name}] %{username} posted in '%{topic_title}'"
+      subject_template: "[%{site_name}] new post in '%{topic_title}'"
       text_body_template: |
-        %{username} posted in '%{topic_title}' on %{site_name}:
-
-        ---
         %{message}
+
+        %{context}
 
         ---
         %{respond_instructions}
@@ -992,7 +1009,6 @@ en:
       text_body_template: |
         %{private_message_from} just sent you a private message
 
-        ---
         %{message}
 
         ---
@@ -1047,7 +1063,7 @@ en:
     access_token_problem: "Tell an admin: Please update the site settings to include the correct discourse_org_access_key."
 
   page_not_found:
-    title: "The page you requested doesn't exist on this discussion forum. Perhaps we can help find it, or another topic like it:"
+    title: "The page you requested doesn't exist or may have been deleted by a moderator."
     popular_topics: "Popular topics"
     recent_topics: "Recent topics"
     see_more: "See More"
@@ -1067,8 +1083,12 @@ en:
   deleted: 'deleted'
 
   upload:
+    unauthorized: "Sorry, the file you are trying to upload is not authorized (authorized extensions: %{authorized_extensions})."
     pasted_image_filename: "Pasted image"
-    image:
+    attachments:
+      too_large: "Sorry, the file you are trying to upload is too big (maximum size is %{max_size_kb}%kb)."
+    images:
+      too_large: "Sorry, the image you are trying to upload is too big (maximum size is %{max_size_kb}%kb), please resize it and try again."
       fetch_failure: "Sorry, there has been an error while fetching the image."
       unknown_image_type: "Sorry, but the file you tried to upload doesn't appear to be an image."
       size_not_found: "Sorry, but we couldn't determine the size of the image. Maybe your image is corrupted?"

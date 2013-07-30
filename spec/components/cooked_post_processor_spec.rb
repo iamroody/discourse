@@ -9,10 +9,36 @@ describe CookedPostProcessor do
     let(:cpp) { CookedPostProcessor.new(post) }
     let(:post_process) { sequence("post_process") }
 
-    it "works on images before oneboxes" do
+    it "post process in sequence" do
+      cpp.expects(:post_process_attachments).in_sequence(post_process)
       cpp.expects(:post_process_images).in_sequence(post_process)
       cpp.expects(:post_process_oneboxes).in_sequence(post_process)
       cpp.post_process
+    end
+
+  end
+
+  context "post_process_attachments" do
+
+    context "with attachment" do
+
+      let(:upload) { Fabricate(:upload) }
+      let(:post) { Fabricate(:post_with_an_attachment) }
+      let(:cpp) { CookedPostProcessor.new(post) }
+
+      # all in one test to speed things up
+      it "works" do
+        Upload.expects(:get_from_url).returns(upload)
+        cpp.post_process_attachments
+        # ensures absolute urls on attachment
+        cpp.html.should =~ /#{LocalStore.base_url}/
+        # ensure name is present
+        cpp.html.should =~ /archive.zip/
+        # keeps the reverse index up to date
+        post.uploads.reload
+        post.uploads.count.should == 1
+      end
+
     end
 
   end
@@ -36,19 +62,19 @@ describe CookedPostProcessor do
 
     end
 
-    context "with uploaded images" do
+    context "with locally uploaded images" do
 
       let(:upload) { Fabricate(:upload) }
-      let(:post) { Fabricate(:post_with_uploaded_images) }
+      let(:post) { Fabricate(:post_with_uploaded_image) }
       let(:cpp) { CookedPostProcessor.new(post) }
-      before { FastImage.stubs(:size) }
+      before { FastImage.stubs(:size).returns([200, 400]) }
 
       # all in one test to speed things up
       it "works" do
-        Upload.expects(:get_from_url).returns(upload).twice
+        Upload.expects(:get_from_url).returns(upload)
         cpp.post_process_images
         # ensures absolute urls on uploaded images
-        cpp.html.should =~ /#{Discourse.base_url_no_prefix}/
+        cpp.html.should =~ /#{LocalStore.base_url}/
         # dirty
         cpp.should be_dirty
         # keeps the reverse index up to date
@@ -58,7 +84,7 @@ describe CookedPostProcessor do
 
     end
 
-    context "width sized images" do
+    context "with sized images" do
 
       let(:post) { build(:post_with_image_url) }
       let(:cpp) { CookedPostProcessor.new(post, image_sizes: {'http://foo.bar/image.png' => {'width' => 111, 'height' => 222}}) }
@@ -112,7 +138,7 @@ describe CookedPostProcessor do
       it "generates overlay information" do
         cpp.post_process_images
         cpp.html.should match_html '<div><a href="http://test.localhost/uploads/default/1/1234567890123456.jpg" class="lightbox"><img src="http://test.localhost/uploads/default/_optimized/da3/9a3/ee5e6b4b0d3_100x200.jpg" width="690" height="1380"><div class="meta">
-<span class="filename">uploaded.jpg</span><span class="informations">1000x2000 | 1.21 KB</span><span class="expand"></span>
+<span class="filename">uploaded.jpg</span><span class="informations">1000x2000 1.21 KB</span><span class="expand"></span>
 </div></a></div>'
         cpp.should be_dirty
       end
@@ -122,7 +148,7 @@ describe CookedPostProcessor do
     context "topic image" do
 
       let(:topic) { build(:topic, id: 1) }
-      let(:post) { Fabricate(:post_with_uploaded_images, topic: topic) }
+      let(:post) { Fabricate(:post_with_uploaded_image, topic: topic) }
       let(:cpp) { CookedPostProcessor.new(post) }
 
       it "adds a topic image if there's one in the post" do

@@ -14,7 +14,8 @@ describe PostsController do
 
   describe 'show' do
 
-    let(:post) { Fabricate(:post, user: log_in) }
+    let(:user) { log_in }
+    let(:post) { Fabricate(:post, user: user) }
 
     it 'ensures the user can see the post' do
       Guardian.any_instance.expects(:can_see?).with(post).returns(false)
@@ -30,7 +31,7 @@ describe PostsController do
     context "deleted post" do
 
       before do
-        post.trash!
+        post.trash!(user)
       end
 
       it "can't find deleted posts as an anonymous user" do
@@ -123,9 +124,14 @@ describe PostsController do
         response.should be_forbidden
       end
 
-      it "calls recover" do
-        Post.any_instance.expects(:recover!)
+      it "recovers a post correctly" do
+        topic_id = create_post.topic_id
+        post = create_post(topic_id: topic_id)
+
+        PostDestroyer.new(user, post).destroy
         xhr :put, :recover, post_id: post.id
+        post.reload
+        post.deleted_at.should == nil
       end
 
     end
@@ -274,6 +280,18 @@ describe PostsController do
         PostCreator.any_instance.expects(:create).returns(new_post)
         xhr :post, :create, {raw: 'test'}
         ::JSON.parse(response.body).should be_present
+      end
+
+      it 'protects against dupes' do
+        # TODO we really should be using a mock redis here
+        xhr :post, :create, {raw: 'this is a test post 123', title: 'this is a test title 123', wpid: 1}
+        response.should be_success
+        original = response.body
+
+        xhr :post, :create, {raw: 'this is a test post 123', title: 'this is a test title 123', wpid: 2}
+        response.should be_success
+
+        response.body.should == original
       end
 
       context "errors" do
